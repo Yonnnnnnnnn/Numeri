@@ -1,0 +1,49 @@
+{
+  "name": "numeri",
+  "version": "0.1.0",
+  "description": "AI-Powered Spreadsheet Application",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron .",
+    "build": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "electron",
+    "spreadsheet",
+    "google-gemini",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "electron": "^25.3.2",
+    "electron-builder": "^24.4.0"
+  },
+  "build": {
+    "appId": "com.numeri.app",
+    "productName": "Numeri",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "dmg"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  }
+}

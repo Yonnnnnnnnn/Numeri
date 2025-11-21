@@ -1,0 +1,17 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.numeri.app
+productName: Numeri
+win:
+  target: nsis
+  icon: assets/icon.ico
+mac:
+  category: public.app-category.productivity
+  target: dmg
+linux:
+  target:
+    - AppImage
+    - deb
+files: []
+electronVersion: 25.9.8
