@@ -22,7 +22,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { currentData, imageBase64, prompt } = req.body;
+    // Robust Destructuring: Check multiple possible keys for image
+    const { currentData, prompt } = req.body;
+    // Check possible keys for the image
+    const imageBase64 = req.body.imageBase64 || req.body.image || req.body.file || req.body.attachment;
+    
+    // Debug Log: Verify what keys we're receiving
+    console.log("Incoming Payload Keys:", Object.keys(req.body));
+    console.log("Image Detected:", !!imageBase64);
 
     // Validate payload size (Vercel limit: 4.5MB)
     const payloadSize = JSON.stringify(req.body).length;
