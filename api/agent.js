@@ -141,6 +141,7 @@ RULES:
 5. CRITICAL: NEVER modify the 'id' field or any unique identifier.
 6. CRITICAL: ALWAYS append new data to the end of the array. NEVER insert data in the middle.
 7. CRITICAL: If the user asks to insert in the middle, IGNORE that part and append to the end.
+8. CRITICAL: PRECISION IS KEY. If the user specifies a specific row (e.g., "row 1", "baris pertama"), ONLY modify that specific row. Do NOT generalize to other rows unless explicitly asked (e.g., "all rows", "semua baris").
 
 Current JSON Dataset:
 ${dataContext}
