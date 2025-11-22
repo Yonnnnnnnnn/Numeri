@@ -481,13 +481,42 @@ export default function App() {
       // Read file content
       const fileContent = await file.text();
 
-      // Validate JSON
+      // Validate and parse JSON
+      let parsedData;
       try {
-        JSON.parse(fileContent);
+        parsedData = JSON.parse(fileContent);
       } catch (e) {
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `❌ Error: File JSON tidak valid. ${e.message}`
+        }]);
+        return;
+      }
+
+      // Convert to array format if needed
+      let convertedContent = fileContent;
+
+      if (!Array.isArray(parsedData) && parsedData.rows && Array.isArray(parsedData.rows)) {
+        // Object with rows property - convert to array with col_0, col_1 format
+        const convertedRows = parsedData.rows.map(row => {
+          const newRow = {};
+          const keys = Object.keys(row);
+          keys.forEach((key, index) => {
+            newRow[`col_${index}`] = row[key];
+          });
+          return newRow;
+        });
+
+        convertedContent = JSON.stringify(convertedRows, null, 2);
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `🔄 File dikonversi dari format object (columns/rows) ke format array. ${parsedData.rows.length} baris data terdeteksi.`
+        }]);
+      } else if (!Array.isArray(parsedData)) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '❌ Error: Format JSON tidak didukung. File harus berupa array atau object dengan property "rows".'
         }]);
         return;
       }
@@ -503,10 +532,10 @@ export default function App() {
         setFiles(prev => prev.filter(f => f.name !== file.name));
       }
 
-      // Add file to list
+      // Add file to list with converted content
       const newFile = {
         name: file.name,
-        content: fileContent
+        content: convertedContent
       };
 
       setFiles(prev => [...prev, newFile]);
@@ -520,7 +549,7 @@ export default function App() {
 
       // Trigger AI analysis
       setTimeout(() => {
-        handleProcessWithAI(fileContent, file.name);
+        handleProcessWithAI(convertedContent, file.name);
       }, 500);
 
     } catch (error) {
