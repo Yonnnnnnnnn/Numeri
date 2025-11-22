@@ -32,17 +32,31 @@ export default async function handler(req, res) {
       });
     }
 
+    // FORCE AUTO-EXECUTE FOR VISION
+    let processedPrompt = prompt;
+    if (imageBase64 && (!prompt || prompt.trim() === "")) {
+        console.log("Image detected with empty prompt. Injecting default execution prompt.");
+        processedPrompt = `
+STRICT INSTRUCTION: 
+1. Analyze the attached image (Receipt/Invoice). 
+2. Extract Date, Total Amount, Merchant, and Items.
+3. AUTOMATICALLY APPEND this as a new transaction to the 'journal_lines' or 'transactions' array in the JSON.
+4. Use logic to determine Debit (Expense/Asset) and Credit (Cash/AP) accounts.
+5. Return ONLY the fully updated JSON. Do not ask for confirmation.
+`;
+    }
+
     let result;
 
     // SKILL ROUTING: Check if this is a vision task
     if (imageBase64) {
       // Vision Task: Use IBM Watsonx
       console.log('Routing to IBM Watsonx for vision task...');
-      result = await handleVisionTask(currentData, imageBase64, prompt);
+      result = await handleVisionTask(currentData, imageBase64, processedPrompt);
     } else {
-      // Text/Logic Task: Use Google Gemini 1.5 Flash
-      console.log('Routing to Gemini 1.5 Flash for logic task...');
-      result = await handleLogicTask(currentData, prompt);
+      // Text/Logic Task: Use Google Gemini 2.5 Flash-Lite
+      console.log('Routing to Gemini 2.5 Flash-Lite for logic task...');
+      result = await handleLogicTask(currentData, processedPrompt);
     }
 
     // Return parsed JSON response
