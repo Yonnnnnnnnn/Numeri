@@ -231,33 +231,37 @@ async function generateIAMToken(apiKey) {
 }
 
 /**
+ * Compress and optimize base64 image for vision processing
+ */
+function compressImageBase64(imageBase64) {
+  // Extract the base64 data (remove data:image/...;base64, prefix)
+  const base64Data = imageBase64.split(',')[1] || imageBase64;
+  
+  // For now, return as-is but in production we could resize/compress
+  // TODO: Add actual image compression if needed
+  return imageBase64;
+}
+
+/**
  * Construct watsonx API payload for vision tasks
  * Uses Llama 3.2 11B Vision for image processing (Zero-shot approach)
  */
 function constructVisionPayload(imageBase64, prompt) {
-  const visionPrompt = `You are a receipt/invoice data extraction expert. Extract information from this image.
-
-${prompt || 'Extract date, total amount, merchant, and items from this receipt.'}
-
-Output format: Return ONLY a single JSON object with this structure:
-{
-  "date": "YYYY-MM-DD",
-  "amount": 0.00,
-  "description": "Merchant name or description",
-  "category": "expense"
-}
-
-Image: ${imageBase64}`;
+  // Compress image to reduce token count
+  const optimizedImage = compressImageBase64(imageBase64);
+  
+  // Ultra-minimal text prompt - base64 still needed for current API structure
+  const visionPrompt = `JSON output: date, amount, description, category. Image: ${optimizedImage}`;
 
   return {
     model_id: 'meta-llama/llama-3-2-11b-vision-instruct',
     input: visionPrompt,
     parameters: {
-      decoding_method: 'greedy',
-      max_new_tokens: 300,
-      min_new_tokens: 1,
-      repetition_penalty: 1.0,
-      stop_sequences: []
+      decoding_method: "greedy",
+      max_new_tokens: 200, // Reduced further
+      min_new_tokens: 10,
+      stop_sequences: ["}"],
+      repetition_penalty: 1.0
     },
   };
 }

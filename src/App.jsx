@@ -149,12 +149,15 @@ const ChatInterface = ({ messages, onSendMessage, isProcessing }) => {
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (file) {
                   const reader = new FileReader();
-                  reader.onload = (event) => {
-                    setCurrentImage(event.target.result);
+                  reader.onload = async (event) => {
+                    const base64Image = event.target.result;
+                    // Compress image
+                    const compressedImage = await compressImage(base64Image);
+                    setCurrentImage(compressedImage);
                     setHasImage(true);
                     setInput(''); // Clear text input when image is selected
                   };
@@ -556,27 +559,56 @@ export default function App() {
     }
   };
 
+  // Compress image before sending to backend
+  const compressImage = (base64Image, maxWidth = 800, quality = 0.7) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Calculate new dimensions
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = base64Image;
+    });
+  };
+
   // Paste Event Listener for Images
   useEffect(() => {
-    const handlePaste = (e) => {
+    const handlePaste = async (e) => {
       const items = e.clipboardData.items;
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf("image") !== -1) {
           e.preventDefault(); // Prevent default paste behavior
           const blob = items[i].getAsFile();
           const reader = new FileReader();
-          reader.onload = (event) => {
+          reader.onload = async (event) => {
             const base64Image = event.target.result;
+            
+            // Compress image to reduce token usage
+            const compressedImage = await compressImage(base64Image);
             
             // Add user message with image
             setMessages(prev => [...prev, {
               role: 'user',
               content: 'Menganalisis gambar ini...',
-              image: base64Image
+              image: compressedImage
             }]);
 
-            // Auto-send to backend with empty text
-            handleSendMessage('', base64Image);
+            // Auto-send compressed image to backend
+            handleSendMessage('', compressedImage);
           };
           reader.readAsDataURL(blob);
         }
