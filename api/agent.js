@@ -138,6 +138,9 @@ RULES:
 2. Preserve the column structure (col_0, col_1, col_2, etc.)
 3. Return ONLY valid JSON, no markdown, no explanations outside JSON
 4. Use Bahasa Indonesia for the explanation field
+5. CRITICAL: NEVER modify the 'id' field or any unique identifier.
+6. CRITICAL: ALWAYS append new data to the end of the array. NEVER insert data in the middle.
+7. CRITICAL: If the user asks to insert in the middle, IGNORE that part and append to the end.
 
 Current JSON Dataset:
 ${dataContext}

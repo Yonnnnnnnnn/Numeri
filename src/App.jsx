@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Folder, FileJson, Save, Send, Image as ImageIcon, Settings, Menu, RotateCcw, Trash2, Plus, X, Server } from 'lucide-react';
+import { Folder, FileJson, Save, Send, Image as ImageIcon, Settings, Menu, RotateCcw, Trash2, Plus, X, Server, History } from 'lucide-react';
 
 // --- MOCK DATA & UTILS ---
 
@@ -185,16 +185,50 @@ export default function App() {
     { role: 'assistant', content: 'Halo! Saya AI Architect. Silakan paste gambar laporan atau beri instruksi untuk mengubah data.' }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [fileHistory, setFileHistory] = useState([]); // Array of { fileName, content, description, timestamp }
+  const [showHistory, setShowHistory] = useState(false);
 
   // Derived State
   const activeFile = files.find(f => f.name === activeFileName);
 
   // Handlers
-  const handleUpdateFileContent = (newContent) => {
+  // Handlers
+  const handleUpdateFileContent = (newContent, description = "Update data") => {
+    const currentFile = files.find(f => f.name === activeFileName);
+    if (currentFile) {
+      // Add to history
+      setFileHistory(prev => {
+        const newHistory = [
+          {
+            fileName: activeFileName,
+            content: currentFile.content,
+            description: description,
+            timestamp: Date.now()
+          },
+          ...prev
+        ].slice(0, 8); // Keep max 8
+        return newHistory;
+      });
+    }
+
     const updatedFiles = files.map(f =>
       f.name === activeFileName ? { ...f, content: newContent } : f
     );
     setFiles(updatedFiles);
+  };
+
+  const handleRollback = (historyItem) => {
+    if (window.confirm(`Rollback ke versi: ${historyItem.description}?`)) {
+      const updatedFiles = files.map(f =>
+        f.name === historyItem.fileName ? { ...f, content: historyItem.content } : f
+      );
+      setFiles(updatedFiles);
+      setShowHistory(false);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ Berhasil rollback ke versi: ${historyItem.description}`
+      }]);
+    }
   };
 
   const handleSendMessage = async (text) => {
@@ -257,7 +291,7 @@ export default function App() {
       // Update file content with AI result
       if (result.content && Array.isArray(result.content)) {
         const updatedContent = JSON.stringify(result.content, null, 2);
-        handleUpdateFileContent(updatedContent);
+        handleUpdateFileContent(updatedContent, result.explanation || "AI Update");
 
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -523,9 +557,40 @@ export default function App() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Undo Last AI Action (Mock)">
-              <RotateCcw size={18} />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className={`p-2 rounded-lg transition-colors ${fileHistory.filter(h => h.fileName === activeFileName).length > 0 ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
+                title="Rollback History"
+                disabled={fileHistory.filter(h => h.fileName === activeFileName).length === 0}
+              >
+                <RotateCcw size={18} />
+              </button>
+              {showHistory && (
+                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                  <div className="p-3 border-b border-slate-700 text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center">
+                    <span>History (Max 8)</span>
+                    <button onClick={() => setShowHistory(false)}><X size={12} /></button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {fileHistory.filter(h => h.fileName === activeFileName).map((item, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleRollback(item)}
+                        className="w-full text-left p-3 hover:bg-slate-700 border-b border-slate-700/50 last:border-0 transition-colors group"
+                      >
+                        <div className="text-xs text-cyan-400 font-mono mb-1">
+                          {new Date(item.timestamp).toLocaleTimeString()}
+                        </div>
+                        <div className="text-sm text-slate-300 group-hover:text-white line-clamp-2">
+                          {item.description}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => activeFile && handleDeleteFile(activeFileName)}
               className={`p-2 rounded-lg transition-colors ${activeFile ? 'text-red-400 hover:text-white hover:bg-red-800/50' : 'text-slate-600 cursor-not-allowed'}`}
