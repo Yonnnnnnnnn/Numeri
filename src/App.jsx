@@ -415,21 +415,84 @@ export default function App() {
     setMessages(prev => [...prev, newMsg]);
     setIsProcessing(true);
 
-    setTimeout(() => {
-      let responseText = "Instruksi diterima. Saya sedang memproses data.";
-
-      if (text.toLowerCase().includes("buat") && text.toLowerCase().includes("file")) {
-        const newFileName = `laporan_${Date.now()}.json`;
-        const newFileContent = JSON.stringify([], null, 2);
-
-        setFiles(prev => [...prev, { name: newFileName, content: newFileContent }]);
-        responseText = `Berhasil membuat file data baru: ${newFileName}.`;
-        setActiveFileName(newFileName);
+    try {
+      // Check if there's an active file
+      if (!activeFile) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '⚠️ Tidak ada file yang aktif. Silakan buat file baru atau upload file JSON terlebih dahulu.'
+        }]);
+        setIsProcessing(false);
+        return;
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+      // Parse current data
+      let currentData;
+      try {
+        currentData = JSON.parse(activeFile.content);
+      } catch (e) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '❌ Error: File aktif memiliki format JSON yang tidak valid.'
+        }]);
+        setIsProcessing(false);
+        return;
+      }
+
+      if (!Array.isArray(currentData)) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '❌ Error: Data harus berupa array.'
+        }]);
+        setIsProcessing(false);
+        return;
+      }
+
+      // Call watsonx API
+      const response = await fetch('/api/agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentData: currentData,
+          prompt: text,
+          isVisionTask: false
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      // Update file content with AI result
+      if (result.content && Array.isArray(result.content)) {
+        const updatedContent = JSON.stringify(result.content, null, 2);
+        handleUpdateFileContent(updatedContent);
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `✅ ${result.explanation || 'Data berhasil diproses!'}\n\n📊 File '${activeFileName}' telah diupdate.`
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: result.explanation || 'Instruksi diterima dan diproses.'
+        }]);
+      }
+
+    } catch (error) {
+      console.error('Chat AI Error:', error);
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ Error memproses instruksi: ${error.message}\n\n💡 Pastikan environment variables sudah di-set di Vercel dan API endpoint tersedia.`
+      }]);
+    } finally {
       setIsProcessing(false);
-    }, 1500);
+    }
   };
 
   const handleCreateFile = () => {
