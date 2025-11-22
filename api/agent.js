@@ -81,14 +81,14 @@ STRICT INSTRUCTION:
 
 /**
  * Handle Vision Tasks using IBM Watsonx
- * Processes images for OCR, receipt extraction, etc.
+ * Processes images for OCR, receipt extraction, etc. (Zero-shot approach)
  */
 async function handleVisionTask(currentData, imageBase64, prompt) {
   // Step 1: Generate IAM Token
   const iamToken = await generateIAMToken(process.env.IBM_CLOUD_API_KEY);
 
-  // Step 2: Construct watsonx vision payload
-  const watsonxPayload = constructVisionPayload(currentData, imageBase64, prompt);
+  // Step 2: Construct watsonx vision payload (zero-shot, no data context)
+  const watsonxPayload = constructVisionPayload(imageBase64, prompt);
 
   // Step 3: Call IBM watsonx API
   const watsonxResponse = await callWatsonxAPI(
@@ -99,8 +99,18 @@ async function handleVisionTask(currentData, imageBase64, prompt) {
     process.env.IBM_PROJECT_ID
   );
 
-  // Step 4: Parse and validate response
-  return parseWatsonxResponse(watsonxResponse);
+  // Step 4: Parse single transaction from vision model
+  const extractedTransaction = parseVisionResponse(watsonxResponse);
+
+  // Step 5: Append to existing data array
+  const updatedData = [...currentData, extractedTransaction];
+
+  // Step 6: Return in expected format
+  return {
+    filename: 'transactions_updated.json',
+    content: updatedData,
+    explanation: `Berhasil menambahkan transaksi dari gambar: ${extractedTransaction.description || 'Receipt'} - Rp ${extractedTransaction.amount || 0}`,
+  };
 }
 
 /**
@@ -222,23 +232,19 @@ async function generateIAMToken(apiKey) {
 
 /**
  * Construct watsonx API payload for vision tasks
- * Uses Llama 3.2 90B Vision for image processing
+ * Uses Llama 3.2 11B Vision for image processing (Zero-shot approach)
  */
-function constructVisionPayload(currentData, imageBase64, prompt) {
-  const dataContext = JSON.stringify(currentData, null, 2);
+function constructVisionPayload(imageBase64, prompt) {
+  const visionPrompt = `You are a receipt/invoice data extraction expert. Extract information from this image.
 
-  const visionPrompt = `You are a receipt/invoice data extraction expert. Extract information from the image and add it to the dataset.
+${prompt || 'Extract date, total amount, merchant, and items from this receipt.'}
 
-Current JSON Dataset:
-${dataContext}
-
-User Command: ${prompt || 'Process this receipt and add it to the dataset.'}
-
-IMPORTANT: Return ONLY valid JSON with this exact structure:
+Output format: Return ONLY a single JSON object with this structure:
 {
-  "filename": "transactions_updated.json",
-  "content": [array of ALL rows including the new one],
-  "explanation": "Description in Bahasa Indonesia"
+  "date": "YYYY-MM-DD",
+  "amount": 0.00,
+  "description": "Merchant name or description",
+  "category": "expense"
 }
 
 Image: ${imageBase64}`;
@@ -248,7 +254,7 @@ Image: ${imageBase64}`;
     input: visionPrompt,
     parameters: {
       decoding_method: 'greedy',
-      max_new_tokens: 900,
+      max_new_tokens: 300,
       min_new_tokens: 1,
       repetition_penalty: 1.0,
       stop_sequences: []
@@ -302,7 +308,41 @@ async function callWatsonxAPI(
 }
 
 /**
- * Parse and validate watsonx API response
+ * Parse and validate watsonx API response for vision tasks
+ * Extracts single transaction object from vision model
+ */
+function parseVisionResponse(response) {
+  if (!response.results || !response.results[0]) {
+    throw new Error('Invalid watsonx response structure');
+  }
+
+  const generatedText = response.results[0].generated_text;
+
+  // Parse the single transaction object from the model
+  let transaction;
+  try {
+    transaction = JSON.parse(generatedText);
+  } catch (e) {
+    // If direct parse fails, try to extract JSON from the text
+    const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No valid JSON found in vision response');
+    }
+    transaction = JSON.parse(jsonMatch[0]);
+  }
+
+  // Validate and normalize transaction structure
+  return {
+    id: Date.now().toString(), // Generate unique ID
+    date: transaction.date || new Date().toISOString().split('T')[0],
+    amount: parseFloat(transaction.amount) || 0,
+    description: transaction.description || 'Receipt',
+    category: transaction.category || 'expense'
+  };
+}
+
+/**
+ * Parse and validate watsonx API response (legacy for text tasks)
  * Extracts generated_text and validates JSON structure
  */
 function parseWatsonxResponse(response) {
