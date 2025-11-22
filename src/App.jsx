@@ -7,7 +7,7 @@ const MOCK_INITIAL_FILES = [];
 
 // --- COMPONENTS ---
 
-const FileSidebar = ({ files, activeFile, onSelectFile, onCreateFile }) => (
+const FileSidebar = ({ files, activeFile, onSelectFile, onCreateFile, onUploadFile }) => (
   <div className="w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 h-full shadow-2xl">
     <div className="p-4 border-b border-slate-800 flex items-center gap-2 font-extrabold text-lg text-white">
       <div className="w-6 h-6 bg-cyan-500 rounded-sm flex items-center justify-center">
@@ -17,13 +17,23 @@ const FileSidebar = ({ files, activeFile, onSelectFile, onCreateFile }) => (
       <span className="text-xs bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400 font-mono">.json</span>
     </div>
 
-    <div className="p-3">
+    <div className="p-3 space-y-2">
       <button
         onClick={onCreateFile}
         className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 px-3 py-2 rounded-lg text-sm transition-colors text-cyan-400 font-semibold border border-cyan-500/30 shadow-md shadow-cyan-900/50"
       >
         <Plus size={16} /> New Data File
       </button>
+
+      <label className="w-full flex items-center justify-center gap-2 bg-green-800/30 hover:bg-green-700/40 active:bg-green-600/50 px-3 py-2 rounded-lg text-sm transition-colors text-green-400 font-semibold border border-green-500/30 shadow-md shadow-green-900/50 cursor-pointer">
+        <FileJson size={16} /> Upload JSON
+        <input
+          type="file"
+          accept=".json,application/json"
+          onChange={onUploadFile}
+          className="hidden"
+        />
+      </label>
     </div>
 
     <div className="flex-1 overflow-y-auto px-2 pb-4">
@@ -34,7 +44,7 @@ const FileSidebar = ({ files, activeFile, onSelectFile, onCreateFile }) => (
         <div className="text-center py-8 px-4">
           <FileJson size={32} className="mx-auto mb-3 text-slate-600 opacity-50" />
           <p className="text-xs text-slate-500 leading-relaxed">
-            No files yet. Click "New Data File" to get started.
+            No files yet. Click "New Data File" or "Upload JSON" to get started.
           </p>
         </div>
       ) : (
@@ -43,8 +53,8 @@ const FileSidebar = ({ files, activeFile, onSelectFile, onCreateFile }) => (
             key={file.name}
             onClick={() => onSelectFile(file.name)}
             className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-1 transition-colors text-left ${activeFile === file.name
-                ? 'bg-cyan-600/30 text-cyan-400 font-semibold border border-cyan-600'
-                : 'hover:bg-slate-800 text-slate-400'
+              ? 'bg-cyan-600/30 text-cyan-400 font-semibold border border-cyan-600'
+              : 'hover:bg-slate-800 text-slate-400'
               }`}
           >
             <FileJson size={16} className={activeFile === file.name ? 'text-cyan-400' : 'text-slate-500'} />
@@ -454,6 +464,140 @@ export default function App() {
     }
   };
 
+  const handleUploadFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.name.endsWith('.json')) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '❌ Error: File harus berformat .json'
+      }]);
+      return;
+    }
+
+    try {
+      // Read file content
+      const fileContent = await file.text();
+
+      // Validate JSON
+      try {
+        JSON.parse(fileContent);
+      } catch (e) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ Error: File JSON tidak valid. ${e.message}`
+        }]);
+        return;
+      }
+
+      // Check if file already exists
+      if (files.some(f => f.name === file.name)) {
+        const overwrite = window.confirm(`File '${file.name}' sudah ada. Timpa file yang ada?`);
+        if (!overwrite) {
+          event.target.value = ''; // Reset input
+          return;
+        }
+        // Remove existing file
+        setFiles(prev => prev.filter(f => f.name !== file.name));
+      }
+
+      // Add file to list
+      const newFile = {
+        name: file.name,
+        content: fileContent
+      };
+
+      setFiles(prev => [...prev, newFile]);
+      setActiveFileName(file.name);
+
+      // Add success message
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ File '${file.name}' berhasil di-upload! File ini sekarang aktif dan siap diproses dengan AI.`
+      }]);
+
+      // Trigger AI analysis
+      setTimeout(() => {
+        handleProcessWithAI(fileContent, file.name);
+      }, 500);
+
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ Error membaca file: ${error.message}`
+      }]);
+    }
+
+    // Reset input
+    event.target.value = '';
+  };
+
+  const handleProcessWithAI = async (content, fileName) => {
+    setIsProcessing(true);
+
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `🤖 Menganalisis file '${fileName}' dengan IBM watsonx AI...`
+    }]);
+
+    try {
+      // Parse current data
+      const currentData = JSON.parse(content);
+
+      if (!Array.isArray(currentData)) {
+        throw new Error('Data harus berupa array');
+      }
+
+      // Call watsonx API via serverless proxy
+      const response = await fetch('/api/agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentData: currentData,
+          prompt: `Analisis data ini dan berikan ringkasan: jumlah baris, struktur kolom, dan insight penting.`,
+          isVisionTask: false
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ Analisis selesai!\n\n${result.explanation || 'Data berhasil diproses.'}\n\n📊 File memiliki ${currentData.length} baris data.`
+      }]);
+
+    } catch (error) {
+      console.error('AI Processing Error:', error);
+
+      // Fallback to basic analysis if API fails
+      try {
+        const data = JSON.parse(content);
+        const rowCount = Array.isArray(data) ? data.length : 0;
+        const columns = rowCount > 0 ? Object.keys(data[0]).length : 0;
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `📊 Analisis lokal:\n\n✅ File berhasil di-load\n📝 Jumlah baris: ${rowCount}\n📋 Jumlah kolom: ${columns}\n\n💡 Anda dapat mengedit data di spreadsheet editor atau gunakan chat untuk memberikan instruksi.`
+        }]);
+      } catch (e) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `⚠️ File di-load tetapi analisis AI gagal. Anda tetap dapat mengedit data secara manual.`
+        }]);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // Paste Event Listener for Images
   useEffect(() => {
     const handlePaste = (e) => {
@@ -495,6 +639,7 @@ export default function App() {
         activeFile={activeFileName}
         onSelectFile={setActiveFileName}
         onCreateFile={handleCreateFile}
+        onUploadFile={handleUploadFile}
       />
 
       <div className="flex-1 flex flex-col h-full min-w-0">
