@@ -1,10 +1,5 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "framework": "vite",
-  "env": {
-    "VITE_IBM_API_KEY": "@ibm_api_key",
-    "VITE_IBM_PROJECT_ID": "@ibm_project_id",
-    "VITE_VERCEL_PROXY_URL": "@vercel_proxy_url"
-  }
+  "framework": "vite"
 }
