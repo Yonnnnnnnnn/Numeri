@@ -124,7 +124,16 @@ async function handleVisionTask(currentData, imageBase64, prompt) {
     console.log("Gemini Vision Result:", responseText);
 
     // Parse the JSON response
-    const extractedTransaction = parseVisionResponse({ results: [{ generated_text: responseText }] });
+    const parsedData = parseVisionResponse(responseText);
+    
+    // Validate and normalize transaction structure
+    const extractedTransaction = {
+      id: Date.now().toString(), // Generate unique ID
+      date: parsedData.date || new Date().toISOString().split('T')[0],
+      amount: parseFloat(parsedData.amount) || 0,
+      description: parsedData.description || parsedData.merchant || 'Receipt',
+      category: parsedData.category || 'expense'
+    };
 
     // Append to existing data array
     const updatedData = [...currentData, extractedTransaction];
@@ -469,4 +478,26 @@ function parseWatsonxResponse(response) {
     content: parsedJSON.content,
     explanation: parsedJSON.explanation || 'Processing complete.',
   };
+}
+
+function parseVisionResponse(text) {
+  console.log("RAW_VISION_RESPONSE:", text);
+  try {
+    // 1. Remove Markdown code blocks if present
+    let cleanText = text.replace(/```json/g, "").replace(/```/g, "");
+    
+    // 2. Find the first '{' and last '}' to isolate the JSON object
+    const startIndex = cleanText.indexOf('{');
+    const endIndex = cleanText.lastIndexOf('}');
+    
+    if (startIndex !== -1 && endIndex !== -1) {
+      cleanText = cleanText.substring(startIndex, endIndex + 1);
+    }
+    
+    // 3. Parse
+    return JSON.parse(cleanText);
+  } catch (error) {
+    console.error("JSON Parse Failed:", error);
+    throw new Error(`Failed to parse JSON from vision response. Raw text: ${text.substring(0, 100)}...`);
+  }
 }
