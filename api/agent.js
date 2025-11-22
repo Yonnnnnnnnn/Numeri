@@ -55,6 +55,44 @@ export default async function handler(req, res) {
     // Step 4: Parse and validate response
     const parsedResponse = parseWatsonxResponse(watsonxResponse);
 
+    // --- SAFETY GUARDRAILS ---
+    // Programmatically enforce rules that AI might miss
+    if (parsedResponse.content && Array.isArray(parsedResponse.content) && Array.isArray(currentData)) {
+      const guardedContent = [];
+      const originalLength = currentData.length;
+
+      // 1. Process Original Rows (Indices 0 to N-1)
+      // We strictly map index-to-index to ensure original rows are preserved and IDs are protected.
+      // If AI inserted in the middle, this might overwrite data, but it guarantees ID integrity.
+      // The strong System Prompt should prevent middle insertion.
+      for (let i = 0; i < originalLength; i++) {
+        const originalRow = currentData[i];
+        // Use the row from AI at the same index
+        const newRow = parsedResponse.content[i];
+
+        if (newRow) {
+          // CRITICAL: Force ID to remain unchanged
+          if (originalRow.hasOwnProperty('id')) {
+            newRow.id = originalRow.id;
+          }
+          guardedContent.push(newRow);
+        } else {
+          // If AI deleted a row (against rules), restore it
+          guardedContent.push(originalRow);
+        }
+      }
+
+      // 2. Process New Rows (Indices N to End)
+      // Any extra rows returned by AI are treated as appended data
+      if (parsedResponse.content.length > originalLength) {
+        for (let i = originalLength; i < parsedResponse.content.length; i++) {
+          guardedContent.push(parsedResponse.content[i]);
+        }
+      }
+
+      parsedResponse.content = guardedContent;
+    }
+
     // Step 5: Return to client
     return res.status(200).json(parsedResponse);
   } catch (error) {
@@ -131,29 +169,49 @@ Image: ${imageBase64}`;
     };
   } else {
     // Text-only task with improved prompt
-    const systemPrompt = `You are a spreadsheet data processing AI. You modify JSON data based on user commands.
+    const systemPrompt = `You are a strict data processing assistant. You receive a JSON dataset and a user command. You must return the updated JSON dataset.
 
-RULES:
-1. ALWAYS return the COMPLETE array (not just changes)
-2. Preserve the column structure (col_0, col_1, col_2, etc.)
-3. Return ONLY valid JSON, no markdown, no explanations outside JSON
-4. Use Bahasa Indonesia for the explanation field
-5. CRITICAL: NEVER modify the 'id' field or any unique identifier.
-6. CRITICAL: ALWAYS append new data to the end of the array. NEVER insert data in the middle.
-7. CRITICAL: If the user asks to insert in the middle, IGNORE that part and append to the end.
-8. CRITICAL: PRECISION IS KEY. If the user specifies a specific row (e.g., "row 1", "baris pertama"), ONLY modify that specific row. Do NOT generalize to other rows unless explicitly asked (e.g., "all rows", "semua baris").
+### CRITICAL RULES (NON-NEGOTIABLE):
+1. **ID PROTECTION**: NEVER change the value of an 'id' field. If the user asks to change an ID, IGNORE that specific part of the request.
+2. **APPEND ONLY**: If adding new data, ALWAYS add it to the end of the array. NEVER insert in the middle.
+3. **PRECISION**: If the user targets a specific row (e.g., "row 1"), ONLY modify that row. Do NOT touch other rows.
+4. **NO DELETION**: Do not delete rows unless explicitly asked.
+
+### EXAMPLES:
+
+**Case 1: Specific Row Update**
+User: "Ubah deskripsi baris 1 jadi KAPITAL"
+Data: [{"id": 1, "desc": "abc"}, {"id": 2, "desc": "def"}]
+Result:
+{
+  "content": [{"id": 1, "desc": "ABC"}, {"id": 2, "desc": "def"}], // Row 2 UNTOUCHED
+  "explanation": "Mengubah deskripsi baris 1 menjadi kapital."
+}
+
+**Case 2: ID Modification Attempt (Forbidden)**
+User: "Ubah ID baris 1 jadi 999"
+Data: [{"id": 10, "val": "x"}]
+Result:
+{
+  "content": [{"id": 10, "val": "x"}], // ID KEPT AS 10. IGNORE USER REQUEST.
+  "explanation": "Permintaan mengubah ID ditolak karena ID bersifat unik dan tetap."
+}
+
+**Case 3: Insertion (Must Append)**
+User: "Sisipkan data baru di antara baris 1 dan 2"
+Data: [{"id": 1}, {"id": 2}]
+Result:
+{
+  "content": [{"id": 1}, {"id": 2}, {"id": 3, "new": "data"}], // ADDED AT THE END
+  "explanation": "Data baru ditambahkan di akhir tabel untuk menjaga integritas urutan."
+}
 
 Current JSON Dataset:
 ${dataContext}
 
 User Command: ${prompt}
 
-Return ONLY this JSON structure:
-{
-  "filename": "transactions_updated.json",
-  "content": [complete array with all rows],
-  "explanation": "Penjelasan perubahan dalam Bahasa Indonesia"
-}`;
+Return ONLY valid JSON with "content" (array) and "explanation" (string).`;
 
     return {
       model_id: 'ibm/granite-3-8b-instruct',
