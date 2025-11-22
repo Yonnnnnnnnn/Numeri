@@ -250,18 +250,26 @@ function constructVisionPayload(imageBase64, prompt) {
   // Compress image to reduce token count
   const optimizedImage = compressImageBase64(imageBase64);
   
-  // Ultra-minimal text prompt with strict JSON instructions
-  const visionPrompt = `Output valid JSON only. Do not include any conversational text. Do not use Markdown formatting. Start with { and end with }. Image: ${optimizedImage}`;
+  // Llama 3.2 Vision STRICT Template
+  const visionPrompt = `<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+${optimizedImage}
+
+Strict Instruction: Extract the receipt data into a valid JSON object with keys: "date", "merchant", "amount", "items" (array).
+Return ONLY the JSON. No markdown.
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+`;
 
   return {
     model_id: 'meta-llama/llama-3-2-11b-vision-instruct',
     input: visionPrompt,
     parameters: {
       decoding_method: "greedy",
-      max_new_tokens: 200, // Reduced further
+      max_new_tokens: 500,
       min_new_tokens: 10,
-      stop_sequences: ["}"],
-      repetition_penalty: 1.0
+      stop_sequences: ["<|eot_id|>", "}"],
+      repetition_penalty: 1.1
     },
   };
 }
