@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Folder, FileJson, Save, Send, Image as ImageIcon, Settings, Menu, RotateCcw, Trash2, Plus, X, Server } from 'lucide-react';
+import { Folder, FileJson, Save, Send, Image as ImageIcon, Settings, Menu, RotateCcw, Trash2, Plus, X, Server, Search } from 'lucide-react';
 
 // --- MOCK DATA & UTILS ---
 
@@ -187,6 +187,7 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileHistory, setFileHistory] = useState({});
   const [showHistory, setShowHistory] = useState(false);
+  const [filteredData, setFilteredData] = useState(null);
 
   // Derived State
   const activeFile = files.find(f => f.name === activeFileName);
@@ -283,13 +284,24 @@ export default function App() {
 
       // Update file content with AI result
       if (result.content && Array.isArray(result.content)) {
-        const updatedContent = JSON.stringify(result.content, null, 2);
-        handleUpdateFileContent(updatedContent, text);
+        if (result.isFilterView) {
+          // Handle Filter View
+          setFilteredData(result.content);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `🔍 ${result.explanation || 'Filter diterapkan.'}\n\nMenampilkan ${result.content.length} data yang cocok.`
+          }]);
+        } else {
+          // Handle Normal Update
+          const updatedContent = JSON.stringify(result.content, null, 2);
+          handleUpdateFileContent(updatedContent, text);
+          setFilteredData(null); // Clear filter on edit
 
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `✅ ${result.explanation || 'Data berhasil diproses!'}\n\n📊 File '${activeFileName}' telah diupdate.`
-        }]);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `✅ ${result.explanation || 'Data berhasil diproses!'}\n\n📊 File '${activeFileName}' telah diupdate.`
+          }]);
+        }
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -597,9 +609,25 @@ export default function App() {
           </div>
         </div>
 
+        {/* Filter Banner */}
+        {filteredData && (
+          <div className="bg-indigo-900/50 border-b border-indigo-500/30 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 text-indigo-300 text-sm">
+              <Search size={16} />
+              <span className="font-medium">Filter View Active: Showing {filteredData.length} results</span>
+            </div>
+            <button
+              onClick={() => setFilteredData(null)}
+              className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-full transition-colors shadow-sm"
+            >
+              Clear Filter
+            </button>
+          </div>
+        )}
+
         {activeFile ? (
           <JsonGridEditor
-            content={activeFile.content}
+            content={filteredData ? JSON.stringify(filteredData) : activeFile.content}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-500 bg-slate-900/50">

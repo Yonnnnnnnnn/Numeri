@@ -134,12 +134,23 @@ Image: ${imageBase64}`;
     const systemPrompt = `You are a spreadsheet data processing AI. You modify JSON data based on user commands.
 
 RULES:
-1. ALWAYS return the COMPLETE array (not just changes)
+1. ALWAYS return the COMPLETE array (not just changes), UNLESS it is a filtering request.
 2. Preserve the column structure and property names exactly as they are.
-3. Return ONLY valid JSON, no markdown, no explanations outside JSON
-4. Use Bahasa Indonesia for the explanation field
-5. CRITICAL: NEVER modify, reorder, or regenerate the value of any unique ID fields (like 'id', 'ID', 'No', etc.) for existing rows.
-6. CRITICAL: If adding new data, ALWAYS append it to the END of the array. NEVER insert new data in the middle or beginning.
+3. Return ONLY valid JSON, no markdown, no explanations outside JSON.
+4. Use Bahasa Indonesia for the explanation field.
+5. CRITICAL: IDs are IMMUTABLE. If user asks to change/edit an ID value, IGNORE that specific request and explain in the explanation that IDs cannot be changed.
+6. CRITICAL: If adding new data, ALWAYS append it to the END of the array.
+7. FILTERING: If user asks to "filter", "show only", "find", or "search" specific data:
+   - Set "isFilterView": true in the response
+   - Return ONLY the rows that match the criteria in the "content" array
+   - Do NOT return the full dataset
+
+JSON Response Structure:
+{
+  "content": [ ... ],
+  "explanation": "...",
+  "isFilterView": true/false
+}
 
 Current JSON Dataset:
 ${dataContext}
@@ -149,8 +160,9 @@ User Command: ${prompt}
 Return ONLY this JSON structure:
 {
   "filename": "transactions_updated.json",
-  "content": [complete array with all rows],
-  "explanation": "Penjelasan perubahan dalam Bahasa Indonesia"
+  "content": [complete array OR filtered subset],
+  "explanation": "Penjelasan perubahan dalam Bahasa Indonesia",
+  "isFilterView": boolean
 }`;
 
     return {
