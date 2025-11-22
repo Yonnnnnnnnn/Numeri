@@ -247,10 +247,11 @@ Image: ${imageBase64}`;
     model_id: 'meta-llama/llama-3-2-90b-instruct-vision-001',
     input: visionPrompt,
     parameters: {
-      decoding_method: 'sampling',
-      max_new_tokens: 4096,
-      min_new_tokens: 50,
-      temperature: 0.3,
+      decoding_method: 'greedy',
+      max_new_tokens: 900,
+      min_new_tokens: 1,
+      repetition_penalty: 1.0,
+      stop_sequences: []
     },
   };
 }
