@@ -244,7 +244,7 @@ IMPORTANT: Return ONLY valid JSON with this exact structure:
 Image: ${imageBase64}`;
 
   return {
-    model_id: 'meta-llama/llama-3-2-90b-instruct-vision-001',
+    model_id: 'meta-llama/llama-3-2-11b-vision-instruct',
     input: visionPrompt,
     parameters: {
       decoding_method: 'greedy',
