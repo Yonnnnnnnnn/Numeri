@@ -80,32 +80,39 @@ STRICT INSTRUCTION:
 }
 
 /**
- * Handle Vision Tasks using IBM Watsonx
- * Processes images for OCR, receipt extraction, etc. (Zero-shot approach)
+ * Handle Vision Tasks using 2-Step Chain (IBM Watsonx OCR + Gemini JSON)
+ * Processes images for OCR, receipt extraction, etc.
  */
 async function handleVisionTask(currentData, imageBase64, prompt) {
-  // Step 1: Generate IAM Token
+  console.log("Starting 2-Step Vision Chain: IBM OCR + Gemini JSON");
+
+  // STEP 1: IBM Watsonx (The Eye) - Pure OCR/Description
+  console.log("Step 1: Calling IBM Watsonx for OCR...");
   const iamToken = await generateIAMToken(process.env.IBM_CLOUD_API_KEY);
-
-  // Step 2: Construct watsonx vision payload (zero-shot, no data context)
-  const watsonxPayload = constructVisionPayload(imageBase64, prompt);
-
-  // Step 3: Call IBM watsonx API
+  
+  // Construct OCR payload - no JSON requirement
+  const ocrPayload = constructOCRPayload(imageBase64);
+  
   const watsonxResponse = await callWatsonxAPI(
     iamToken,
-    watsonxPayload,
+    ocrPayload,
     process.env.IBM_REGION,
     process.env.IBM_WATSONX_HOST,
     process.env.IBM_PROJECT_ID
   );
 
-  // Step 4: Parse single transaction from vision model
-  const extractedTransaction = parseVisionResponse(watsonxResponse);
+  // Extract raw text from IBM response
+  const rawText = watsonxResponse.results[0]?.generated_text || '';
+  console.log("IBM OCR Result:", rawText);
 
-  // Step 5: Append to existing data array
+  // STEP 2: Gemini 2.5 Flash-Lite (The Brain) - JSON Formatting
+  console.log("Step 2: Calling Gemini for JSON formatting...");
+  const extractedTransaction = await parseTextToJSON(rawText);
+
+  // STEP 3: Append to existing data array
   const updatedData = [...currentData, extractedTransaction];
 
-  // Step 6: Return in expected format
+  // STEP 4: Return in expected format
   return {
     filename: 'transactions_updated.json',
     content: updatedData,
@@ -243,32 +250,31 @@ function compressImageBase64(imageBase64) {
 }
 
 /**
- * Construct watsonx API payload for vision tasks
- * Uses Llama 3.2 11B Vision for image processing (Zero-shot approach)
+ * Construct watsonx API payload for OCR tasks (Step 1 of 2-step chain)
+ * Uses Llama 3.2 11B Vision for pure text extraction
  */
-function constructVisionPayload(imageBase64, prompt) {
+function constructOCRPayload(imageBase64) {
   // Compress image to reduce token count
   const optimizedImage = compressImageBase64(imageBase64);
   
-  // Llama 3.2 Vision STRICT Template
-  const visionPrompt = `<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+  // OCR-focused prompt - no JSON requirement
+  const ocrPrompt = `<|begin_of_text|><|start_header_id|>user<|end_header_id|>
 
 ${optimizedImage}
 
-Strict Instruction: Extract the receipt data into a valid JSON object with keys: "date", "merchant", "amount", "items" (array).
-Return ONLY the JSON. No markdown.
+Describe this image and transcribe all visible text. List the items, prices, dates, and merchant name clearly. Do not use JSON format.
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 `;
 
   return {
     model_id: 'meta-llama/llama-3-2-11b-vision-instruct',
-    input: visionPrompt,
+    input: ocrPrompt,
     parameters: {
       decoding_method: "greedy",
       max_new_tokens: 500,
       min_new_tokens: 10,
-      stop_sequences: ["<|eot_id|>", "}"],
+      stop_sequences: ["<|eot_id|>"],
       repetition_penalty: 1.1
     },
   };
@@ -320,65 +326,80 @@ async function callWatsonxAPI(
 }
 
 /**
- * Parse and validate watsonx API response for vision tasks
- * Extracts single transaction object from vision model
+ * Parse OCR text to JSON using Gemini 2.5 Flash-Lite (Step 2 of 2-step chain)
+ * Takes raw text from IBM Watsonx and formats into structured JSON
  */
-function parseVisionResponse(response) {
-  if (!response.results || !response.results[0]) {
-    throw new Error('Invalid watsonx response structure');
+async function parseTextToJSON(rawText) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  
+  // Try to get the model - handle potential API version requirements
+  let model;
+  try {
+    model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+  } catch (initError) {
+    // If initialization fails, try with v1beta API
+    console.log('Attempting fallback to v1beta API for Gemini 2.5 Flash-Lite...');
+    model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.5-flash-lite',
+      apiVersion: 'v1beta'
+    });
   }
 
-  const generatedText = response.results[0].generated_text;
-  
-  // DEBUG: Log raw response for debugging
-  console.log("RAW_IBM_RESPONSE:", generatedText);
+  const systemPrompt = `Parse this receipt text into a valid JSON object with keys: "date", "merchant", "amount", "items" (array), "description". 
+Use today's date if not found. Extract total amount. Create reasonable item names and prices if unclear.
+
+Raw text from OCR:
+${rawText}
+
+Return ONLY valid JSON. No markdown. No explanation.`;
 
   try {
-    // Remove markdown code blocks
-    let cleanText = generatedText.replace(/```json/g, "").replace(/```/g, "");
-    
-    // Extract JSON part between first { and last }
-    const startIndex = cleanText.indexOf('{');
-    const endIndex = cleanText.lastIndexOf('}');
-    
-    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-      cleanText = cleanText.substring(startIndex, endIndex + 1);
-      
-      // Parse the JSON
-      const transaction = JSON.parse(cleanText);
-      
-      // Validate and normalize transaction structure
-      return {
-        id: Date.now().toString(), // Generate unique ID
-        date: transaction.date || new Date().toISOString().split('T')[0],
-        amount: parseFloat(transaction.amount) || 0,
-        description: transaction.description || 'Receipt',
-        category: transaction.category || 'expense'
-      };
-    }
-    
-    throw new Error("No JSON brackets found in response");
-    
-  } catch (error) {
-    // Fallback: Try regex extraction as last resort
+    const response = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.3,
+        maxOutputTokens: 1000,
+      },
+    });
+
+    const responseText = response.response.text();
+    console.log("Gemini JSON Result:", responseText);
+
+    // Parse the JSON response
+    let parsedJSON;
     try {
-      const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const transaction = JSON.parse(jsonMatch[0]);
-        return {
-          id: Date.now().toString(),
-          date: transaction.date || new Date().toISOString().split('T')[0],
-          amount: parseFloat(transaction.amount) || 0,
-          description: transaction.description || 'Receipt',
-          category: transaction.category || 'expense'
-        };
+      parsedJSON = JSON.parse(responseText);
+    } catch (e) {
+      // If direct parse fails, try to extract JSON from the text
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in Gemini response');
       }
-    } catch (fallbackError) {
-      // Fallback failed too
+      parsedJSON = JSON.parse(jsonMatch[0]);
     }
+
+    // Validate and normalize transaction structure
+    return {
+      id: Date.now().toString(), // Generate unique ID
+      date: parsedJSON.date || new Date().toISOString().split('T')[0],
+      amount: parseFloat(parsedJSON.amount) || 0,
+      description: parsedJSON.description || parsedJSON.merchant || 'Receipt',
+      category: parsedJSON.category || 'expense',
+      merchant: parsedJSON.merchant || 'Unknown',
+      items: parsedJSON.items || []
+    };
+  } catch (error) {
+    // Log specific error for debugging
+    console.error('Gemini JSON parsing error:', {
+      error: error.message,
+      status: error.status,
+      statusText: error.statusText,
+      stack: error.stack
+    });
     
-    // Include raw text snippet in error for debugging
-    throw new Error(`Failed to parse JSON from vision response. Raw text snippet: "${generatedText.substring(0, 100)}..." Error: ${error.message}`);
+    // Re-throw with clear message
+    throw new Error(`Gemini JSON parsing failed: ${error.message}`);
   }
 }
 
