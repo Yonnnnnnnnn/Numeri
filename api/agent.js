@@ -88,7 +88,19 @@ async function handleVisionTask(currentData, imageBase64, prompt) {
  */
 async function handleLogicTask(currentData, userPrompt) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  
+  // Try to get the model - handle potential API version requirements
+  let model;
+  try {
+    model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+  } catch (initError) {
+    // If initialization fails, try with v1beta API
+    console.log('Attempting fallback to v1beta API for Gemini 2.5 Flash-Lite...');
+    model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.5-flash-lite',
+      apiVersion: 'v1beta'
+    });
+  }
 
   const dataContext = JSON.stringify(currentData, null, 2);
 
@@ -148,8 +160,8 @@ Return ONLY this JSON structure (no markdown, no explanations outside JSON):
       explanation: parsedJSON.explanation || 'Processing complete.',
     };
   } catch (error) {
-    // Log detailed error for debugging
-    console.error('Gemini 2.0 Flash API Error:', {
+    // Log specific error for debugging
+    console.error('Failed to connect to Gemini 2.5 Flash-Lite. Check API Key or Model ID.', {
       error: error.message,
       status: error.status,
       statusText: error.statusText,
@@ -157,7 +169,7 @@ Return ONLY this JSON structure (no markdown, no explanations outside JSON):
     });
     
     // Re-throw with clear message
-    throw new Error(`Gemini model 'gemini-2.0-flash-exp' failed: ${error.message}`);
+    throw new Error(`Gemini model 'gemini-2.5-flash-lite' failed: ${error.message}`);
   }
 }
 
