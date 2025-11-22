@@ -70,6 +70,8 @@ import JsonGridEditor from './components/JsonGridEditor';
 
 const ChatInterface = ({ messages, onSendMessage, isProcessing }) => {
   const [input, setInput] = useState('');
+  const [currentImage, setCurrentImage] = useState(null);
+  const [hasImage, setHasImage] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -80,9 +82,11 @@ const ChatInterface = ({ messages, onSendMessage, isProcessing }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
-    onSendMessage(input);
+    if (!input.trim() && !hasImage) return;
+    onSendMessage(input, currentImage);
     setInput('');
+    setCurrentImage(null);
+    setHasImage(false);
   };
 
   const ChatBubble = ({ role, content, image }) => {
@@ -138,8 +142,28 @@ const ChatInterface = ({ messages, onSendMessage, isProcessing }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Tulis instruksi atau paste gambar (Ctrl+V)..."
-            className="w-full pl-4 pr-12 py-3 bg-slate-700 placeholder-slate-400 text-white focus:bg-slate-600 focus:border-cyan-500 border border-slate-700 rounded-xl text-sm outline-none transition-all shadow-inner"
+            className="w-full pl-4 pr-20 py-3 bg-slate-700 placeholder-slate-400 text-white focus:bg-slate-600 focus:border-cyan-500 border border-slate-700 rounded-xl text-sm outline-none transition-all shadow-inner"
           />
+          <label className="absolute right-12 top-2 p-1.5 bg-slate-600 text-white rounded-lg hover:bg-slate-500 cursor-pointer transition-colors">
+            <ImageIcon size={16} />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    setCurrentImage(event.target.result);
+                    setHasImage(true);
+                    setInput(''); // Clear text input when image is selected
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="hidden"
+            />
+          </label>
           <button
             type="submit"
             disabled={isProcessing}
@@ -148,11 +172,32 @@ const ChatInterface = ({ messages, onSendMessage, isProcessing }) => {
             <Send size={16} />
           </button>
         </div>
+        
+        {/* Show image preview */}
+        {hasImage && currentImage && (
+          <div className="mt-2 p-2 bg-slate-700 rounded-lg border border-slate-600">
+            <div className="flex items-center gap-2">
+              <img src={currentImage} alt="Preview" className="w-12 h-12 object-cover rounded" />
+              <span className="text-xs text-slate-300">Image attached</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentImage(null);
+                  setHasImage(false);
+                }}
+                className="ml-auto text-red-400 hover:text-red-300"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div className="mt-2 flex justify-between items-center text-xs text-slate-500">
           <span className="flex items-center gap-1 cursor-default">
-            <ImageIcon size={12} className='text-cyan-400' /> Multimodal Input Ready (Ctrl+V)
+            <ImageIcon size={12} className='text-cyan-400' /> Multimodal Input Ready (Ctrl+V or Upload)
           </span>
-          <span className='font-mono'>Gemini 2.5 Flash</span>
+          <span className='font-mono'>Hybrid AI</span>
         </div>
       </form>
     </div>
@@ -225,9 +270,12 @@ export default function App() {
     }]);
   };
 
-  const handleSendMessage = async (text) => {
-    const newMsg = { role: 'user', content: text };
-    setMessages(prev => [...prev, newMsg]);
+  const handleSendMessage = async (text, imageBase64 = null) => {
+    // Don't add duplicate user message if this is from paste handler
+    if (!imageBase64) {
+      const newMsg = { role: 'user', content: text };
+      setMessages(prev => [...prev, newMsg]);
+    }
     setIsProcessing(true);
 
     try {
@@ -263,7 +311,7 @@ export default function App() {
         return;
       }
 
-      // Call watsonx API
+      // Call hybrid AI API
       const response = await fetch('/api/agent', {
         method: 'POST',
         headers: {
@@ -272,7 +320,7 @@ export default function App() {
         body: JSON.stringify({
           currentData: currentData,
           prompt: text,
-          isVisionTask: false
+          imageBase64: imageBase64 // Send image data to backend
         })
       });
 
@@ -461,7 +509,7 @@ export default function App() {
         throw new Error('Data harus berupa array');
       }
 
-      // Call watsonx API via serverless proxy
+      // Call hybrid AI API via serverless proxy
       const response = await fetch('/api/agent', {
         method: 'POST',
         headers: {
@@ -469,8 +517,7 @@ export default function App() {
         },
         body: JSON.stringify({
           currentData: currentData,
-          prompt: `Analisis data ini dan berikan ringkasan: jumlah baris, struktur kolom, dan insight penting.`,
-          isVisionTask: false
+          prompt: `Analisis data ini dan berikan ringkasan: jumlah baris, struktur kolom, dan insight penting.`
         })
       });
 
@@ -515,23 +562,21 @@ export default function App() {
       const items = e.clipboardData.items;
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf("image") !== -1) {
+          e.preventDefault(); // Prevent default paste behavior
           const blob = items[i].getAsFile();
           const reader = new FileReader();
           reader.onload = (event) => {
+            const base64Image = event.target.result;
+            
+            // Add user message with image
             setMessages(prev => [...prev, {
               role: 'user',
               content: 'Menganalisis gambar ini...',
-              image: event.target.result
+              image: base64Image
             }]);
 
-            setIsProcessing(true);
-            setTimeout(() => {
-              setIsProcessing(false);
-              setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: 'Saya telah menganalisis gambar laporan tersebut. Saya siap mengubahnya menjadi data JSON. Apakah Anda ingin menyimpannya ke file yang sedang aktif atau membuat file baru?'
-              }]);
-            }, 2000);
+            // Auto-send to backend with empty text
+            handleSendMessage('', base64Image);
           };
           reader.readAsDataURL(blob);
         }
@@ -540,7 +585,7 @@ export default function App() {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, []);
+  }, [activeFile]);
 
   return (
     <div className="flex h-screen bg-slate-950 font-inter text-white overflow-hidden">
