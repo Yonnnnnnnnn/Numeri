@@ -88,7 +88,7 @@ async function handleVisionTask(currentData, imageBase64, prompt) {
  */
 async function handleLogicTask(currentData, userPrompt) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
   const dataContext = JSON.stringify(currentData, null, 2);
 
@@ -112,40 +112,53 @@ Return ONLY this JSON structure (no markdown, no explanations outside JSON):
   "explanation": "Penjelasan perubahan dalam Bahasa Indonesia"
 }`;
 
-  const response = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.3,
-      maxOutputTokens: 4096,
-    },
-  });
-
-  const responseText = response.response.text();
-
-  // Parse the JSON response
-  let parsedJSON;
   try {
-    parsedJSON = JSON.parse(responseText);
-  } catch (e) {
-    // If direct parse fails, try to extract JSON from the text
-    const jsonMatch = responseText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No valid JSON found in Gemini response');
+    const response = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.3,
+        maxOutputTokens: 4096,
+      },
+    });
+
+    const responseText = response.response.text();
+
+    // Parse the JSON response
+    let parsedJSON;
+    try {
+      parsedJSON = JSON.parse(responseText);
+    } catch (e) {
+      // If direct parse fails, try to extract JSON from the text
+      const jsonMatch = responseText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in Gemini response');
+      }
+      parsedJSON = JSON.parse(jsonMatch[0]);
     }
-    parsedJSON = JSON.parse(jsonMatch[0]);
-  }
 
-  // Validate structure
-  if (!parsedJSON.content || !Array.isArray(parsedJSON.content)) {
-    throw new Error('Gemini response missing required "content" array');
-  }
+    // Validate structure
+    if (!parsedJSON.content || !Array.isArray(parsedJSON.content)) {
+      throw new Error('Gemini response missing required "content" array');
+    }
 
-  return {
-    filename: parsedJSON.filename || 'transactions_updated.json',
-    content: parsedJSON.content,
-    explanation: parsedJSON.explanation || 'Processing complete.',
-  };
+    return {
+      filename: parsedJSON.filename || 'transactions_updated.json',
+      content: parsedJSON.content,
+      explanation: parsedJSON.explanation || 'Processing complete.',
+    };
+  } catch (error) {
+    // Log detailed error for debugging
+    console.error('Gemini 2.0 Flash API Error:', {
+      error: error.message,
+      status: error.status,
+      statusText: error.statusText,
+      stack: error.stack
+    });
+    
+    // Re-throw with clear message
+    throw new Error(`Gemini model 'gemini-2.0-flash-exp' failed: ${error.message}`);
+  }
 }
 
 /**
