@@ -80,44 +80,73 @@ STRICT INSTRUCTION:
 }
 
 /**
- * Handle Vision Tasks using 2-Step Chain (IBM Watsonx OCR + Gemini JSON)
+ * Handle Vision Tasks using Gemini 2.5 Flash-Lite with native multimodal support
  * Processes images for OCR, receipt extraction, etc.
  */
 async function handleVisionTask(currentData, imageBase64, prompt) {
-  console.log("Starting 2-Step Vision Chain: IBM OCR + Gemini JSON");
+  console.log("Starting Gemini Vision Task with native multimodal support");
 
-  // STEP 1: IBM Watsonx (The Eye) - Pure OCR/Description
-  console.log("Step 1: Calling IBM Watsonx for OCR...");
-  const iamToken = await generateIAMToken(process.env.IBM_CLOUD_API_KEY);
+  // Initialize Gemini
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   
-  // Construct OCR payload - no JSON requirement
-  const ocrPayload = constructOCRPayload(imageBase64);
-  
-  const watsonxResponse = await callWatsonxAPI(
-    iamToken,
-    ocrPayload,
-    process.env.IBM_REGION,
-    process.env.IBM_WATSONX_HOST,
-    process.env.IBM_PROJECT_ID
-  );
+  // Try to get the model - handle potential API version requirements
+  let model;
+  try {
+    model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+  } catch (initError) {
+    // If initialization fails, try with v1beta API
+    console.log('Attempting fallback to v1beta API for Gemini 2.5 Flash-Lite...');
+    model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.5-flash-lite',
+      apiVersion: 'v1beta'
+    });
+  }
 
-  // Extract raw text from IBM response
-  const rawText = watsonxResponse.results[0]?.generated_text || '';
-  console.log("IBM OCR Result:", rawText);
+  // Clean base64 string - remove data URI header
+  const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
-  // STEP 2: Gemini 2.5 Flash-Lite (The Brain) - JSON Formatting
-  console.log("Step 2: Calling Gemini for JSON formatting...");
-  const extractedTransaction = await parseTextToJSON(rawText);
-
-  // STEP 3: Append to existing data array
-  const updatedData = [...currentData, extractedTransaction];
-
-  // STEP 4: Return in expected format
-  return {
-    filename: 'transactions_updated.json',
-    content: updatedData,
-    explanation: `Berhasil menambahkan transaksi dari gambar: ${extractedTransaction.description || 'Receipt'} - Rp ${extractedTransaction.amount || 0}`,
+  // Construct the multimodal parts correctly
+  const imagePart = {
+    inlineData: {
+      data: cleanBase64,
+      mimeType: "image/jpeg"
+    }
   };
+
+  const textPart = {
+    text: "Extract receipt data (Date, Merchant, Amount, Items) into strict JSON. No markdown."
+  };
+
+  try {
+    console.log("Calling Gemini with native multimodal input...");
+    const result = await model.generateContent([textPart, imagePart]);
+    const responseText = result.response.text();
+    console.log("Gemini Vision Result:", responseText);
+
+    // Parse the JSON response
+    const extractedTransaction = parseVisionResponse({ results: [{ generated_text: responseText }] });
+
+    // Append to existing data array
+    const updatedData = [...currentData, extractedTransaction];
+
+    // Return in expected format
+    return {
+      filename: 'transactions_updated.json',
+      content: updatedData,
+      explanation: `Berhasil menambahkan transaksi dari gambar: ${extractedTransaction.description || 'Receipt'} - Rp ${extractedTransaction.amount || 0}`,
+    };
+  } catch (error) {
+    // Log specific error for debugging
+    console.error('Gemini Vision error:', {
+      error: error.message,
+      status: error.status,
+      statusText: error.statusText,
+      stack: error.stack
+    });
+    
+    // Re-throw with clear message
+    throw new Error(`Gemini Vision processing failed: ${error.message}`);
+  }
 }
 
 /**
