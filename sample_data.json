@@ -1,0 +1,26 @@
+[
+  {
+    "id": "a1b2-c3d4-e5f6-g7h8",
+    "date": "2023-11-22",
+    "description": "IBM Cloud Credits",
+    "amount": 1500000,
+    "category": "Software",
+    "type": "expense"
+  },
+  {
+    "id": "i9j0-k1l2-m3n4-o5p6",
+    "date": "2023-11-23",
+    "description": "Client Project Payment",
+    "amount": 5000000,
+    "category": "Income",
+    "type": "income"
+  },
+  {
+    "id": "q7r8-s9t0-u1v2-w3x4",
+    "date": "2023-11-24",
+    "description": "Office Supplies",
+    "amount": 250000,
+    "category": "Office",
+    "type": "expense"
+  }
+]

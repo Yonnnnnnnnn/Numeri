@@ -1,0 +1,270 @@
+﻿Product Requirements Document (PRD): Numeri (Upload Edition)
+Edisi: IBM Agentic AI Hackathon (Final Release v4.0 - Simple Flow)
+Tujuan: Proof of Concept (PoC) - Agentic Data Architect
+Platform: Web Application (React/Vite)
+Core Brain: IBM watsonx Orchestrate
+Hosting: Vercel (Frontend + Serverless Proxy)
+Data Flow: User Upload → In-Memory Processing → User Download
+1. Overview
+Numeri adalah tool "Vibe-Coding" berbasis web untuk mengubah data mentah (gambar/teks) menjadi struktur JSON yang rapi.
+Dalam edisi Hackathon ini, Numeri beroperasi sebagai Stateless File Processor. Pengguna mengunggah file JSON atau gambar struk, Agent Numeri (IBM watsonx) memprosesnya di cloud, dan pengguna mengunduh hasil akhirnya. Tidak ada penyimpanan permanen di server maupun akses langsung ke hard drive pengguna, menjamin keamanan dan kemudahan penggunaan.
+2. Tech Stack
+* Frontend: React + Vite + Tailwind CSS.
+* State Management: React State (In-Memory Buffer).
+* Orchestration Engine: IBM watsonx Orchestrate (Agent Builder).
+* AI Models:
+   * Logic: IBM Granite 3.0 8B Instruct (JSON Construction).
+   * Vision: Llama 3.2 90B Vision (Receipt/Invoice Analysis).
+* Backend Proxy: Vercel Serverless Functions (Node.js).
+* File Handling: HTML5 File API (<input type="file"> & Blob download).
+3. User Flow Scenarios (Upload-Process-Download)
+Skenario: "Digitalisasi Struk Belanja"
+1. Upload: User membuka Numeri dan mengklik "Upload JSON" (untuk memuat data lama) atau memulai dengan grid kosong.
+2. Input Vision: User mengklik "Upload Image" dan memilih foto struk belanja.
+3. Process:
+   * PWA mengirim gambar (Base64) + konten JSON saat ini ke Vercel Proxy.
+   * Request diteruskan ke IBM watsonx Orchestrate.
+   * Agent Numeri mengekstrak data dari gambar menggunakan Llama 3.2 Vision.
+   * Agent menggabungkan data baru ke dalam array JSON yang ada.
+4. Review: Hasil JSON baru ditampilkan di Grid Editor. User bisa melihat baris baru yang ditambahkan AI.
+5. Download: User mengklik tombol "Download JSON" untuk menyimpan file transactions_updated.json ke komputer.
+4. Functional Requirements
+ID
+	Requirement
+	Deskripsi Teknis
+	FR-01
+	IBM Agent Config
+	Agent watsonx dikonfigurasi untuk menerima input teks/gambar dan SELALU mengembalikan full JSON object.
+	FR-02
+	Secure Proxy
+	Middleware Vercel (/api/agent) menangani rotasi token IAM IBM dan menyembunyikan API Key.
+	FR-03
+	Vision Handling
+	Konversi gambar upload ke Base64 di client-side sebelum dikirim ke API.
+	FR-04
+	Schema Enforcement
+	Agent memvalidasi output terhadap skema JSON sebelum dikirim balik ke UI.
+	FR-05
+	File Upload Handling
+	Parsing file .json yang diupload user ke dalam variabel state React (Memory Buffer).
+	FR-06
+	Download Generation
+	Mengubah state React kembali menjadi file .json (URL.createObjectURL) saat user klik Download.
+	FR-07
+	Stateless Processing
+	Server tidak boleh menyimpan file user. Data hanya hidup selama sesi browser aktif.
+	5. Konfigurasi Agent (IBM watsonx Orchestrate)
+Konfigurasi ini memastikan AI mengembalikan file utuh, meminimalisir logika rumit di frontend.
+* Name: Numeri Architect
+* Model: Llama 3.2 90B Vision Instruct (Multimodal).
+* Instructions (System Prompt):
+You are Numeri, an expert Data Architect Agent running on IBM watsonx.
+YOUR GOAL:
+Receive an existing JSON dataset (or empty list) and a User Input (Text command or Image).
+Return the COMPLETE, UPDATED JSON dataset.
+STRICT DATA SCHEMAS:
+1. Transactions: { "id": "uuid", "date": "YYYY-MM-DD", "description": "string", "amount": number, "category": "string", "type": "income|expense" }
+OUTPUT RULES:
+1. You must ONLY respond with the FINAL VALID JSON.
+2. DO NOT return a "patch" or "diff". Return the FULL file content.
+3. DO NOT include markdown formatting (no triple backticks).
+4. DO NOT include conversational filler like "Here is the updated file".
+5. Structure: { "filename": "transactions.json", "content": [ ...all rows... ], "explanation": "Added 1 receipt from image." }
+VISION TASKS:
+If an image is provided, extract the Date, Total Amount, and Merchant Name (Description). Map it to the Schema. Generate a UUID. Append this new object to the existing array.
+6. Data Architecture (In-Memory Schemas)
+Struktur data yang diharapkan dari upload user dan output AI.
+A. transactions.json
+[
+  {
+    "id": "a1b2-c3d4",
+    "date": "2023-11-22",
+    "description": "IBM Cloud Credits",
+    "amount": 1500000,
+    "category": "Software",
+    "type": "expense"
+  }
+]
+
+
+B. custom_schemas.json (Optional Upload)
+User bisa mengupload file ini bersamaan untuk memberitahu AI tentang kolom tambahan.
+{
+  "custom_fields": {
+    "transactions": { "tax_deductible": "boolean" }
+  }
+}
+
+
+7. Architecture Diagram (Stateless Flow)
+graph LR
+    subgraph User_Device [User Laptop]
+        User((User))
+        Browser[Numeri Web App]
+        File[JSON/Image File]
+    end
+    
+    subgraph Cloud [Vercel Platform]
+        Proxy[Serverless Function]
+    end
+    
+    subgraph IBM [IBM Cloud]
+        Agent[watsonx Agent]
+        Llama[Llama 3.2 Vision]
+    end
+
+
+    User --1. Upload File--> Browser
+    Browser --2. Parse to Memory--> Browser
+    User --3. Trigger AI (Prompt/Image)--> Browser
+    Browser --4. JSON + Image (Base64)--> Proxy
+    Proxy --5. Secure Request--> Agent
+    Agent --6. Inference--> Llama
+    Llama --7. Full JSON Result--> Agent
+    Agent --8. Response--> Proxy
+    Proxy --9. Update State--> Browser
+    Browser --10. Render Grid--> User
+    User --11. Click Download--> File
+
+
+8. Deliverables
+1. Vercel Project: URL publik yang bisa diakses juri.
+2. Source Code: Repository GitHub bersih tanpa API Key.
+3. Demo Assets: Contoh file sample_receipt.jpg dan sample_data.json untuk mempermudah pengujian juri.
+9. Non-Functional Requirements (NFR)
+Security
+* Zero-State: Tidak ada database. Jika user refresh halaman, data hilang (kecuali di-download sebelumnya). Ini fitur privasi, bukan bug.
+* Input Validation: Vercel Proxy membatasi ukuran payload maksimal 4.5MB (batas Serverless Function) untuk mencegah abuse.
+Performance
+* Client-Side Speed: Parsing JSON dan rendering tabel dilakukan di browser (main thread), sangat cepat untuk file < 1MB.
+* Optimistic Updates: UI menampilkan loading spinner "Analyzing Document..." saat menunggu respons IBM.
+Error Handling
+Error Case
+	System Behavior
+	Invalid File Upload
+	Jika user upload file non-JSON atau JSON rusak, tampilkan Alert: "Invalid JSON Format". Reset ke grid kosong.
+	Vision Fail
+	Jika gambar buram, Agent mengembalikan JSON lama tanpa perubahan + explanation: "Image unclear". UI menampilkan pesan toast warning.
+	Empty Input
+	Jika user menekan "Process" tanpa upload apapun, kirim array kosong [] ke AI sebagai start awal.
+	IBM Timeout
+	Jika watsonx memakan waktu > 30 detik (limit Vercel hobby), tampilkan: "Process timed out. Try smaller image."
+	10. Acceptance Criteria & Success Metrics
+Acceptance Criteria (MVP)
+1. File Upload: Sistem menerima upload transactions.json valid dan menampilkannya di tabel.
+2. Vision-to-Data: User upload gambar struk → Sistem menambah baris baru di tabel dengan nominal yang benar.
+3. Chat Modification: User mengetik "Ubah deskripsi transaksi terakhir jadi 'Lunch'" → Data di tabel berubah.
+4. Download Integrity: File yang didownload valid JSON dan bisa dibuka kembali oleh aplikasi.
+5. No Local Artifacts: Aplikasi tidak meminta izin akses folder (permission prompt) sama sekali.
+Success Metrics
+1. Demo Smoothness: Presentasi berjalan tanpa error "Permission Denied" atau isu browser compatibility.
+2. Accuracy: 3 dari 3 percobaan upload struk menghasilkan angka amount yang tepat.
+
+
+11. API Contract – IBM Watsonx Orchestrate Integration
+This section defines the mandatory contract between the Vercel Serverless Proxy and the IBM watsonx Orchestrate Agent deployment. The Vercel function is responsible for pre-processing, authentication (IAM Token management), and post-processing the final response.
+11.1 Endpoint and Authentication
+The Vercel Proxy must target the general Watsonx API endpoint for model/agent inference.
+Component
+	Specification
+	Notes
+	Method
+	POST
+	
+
+	Endpoint URL
+	https://{region}.{watsonx_host}/v2/text/generate
+	Exact host and region determined by IBM Cloud setup (e.g., us-south).
+	Header: Authorization
+	Bearer {IAM_TOKEN}
+	Token generated by the Vercel Proxy using IBM_CLOUD_API_KEY.
+	Header: Content-Type
+	application/json
+	
+
+	Header: IBM-Project-Id
+	{IBM_PROJECT_ID}
+	Required for billing and resource isolation. Stored as Vercel Env Var.
+	11.2 Request Payload Structure
+The payload must be constructed to include the full context required by the Numeri Architect Agent: the user's prompt, the full dataset content, and any visual input.
+A. Text-Only Task (e.g., "Change category to 'Office'")
+{
+  "model_id": "ibm/granite-3.0-8b-instruct", 
+  "input": "Current JSON Dataset:\n\n{FULL JSON CONTENT UPLOADED BY USER}\n\nUser Command: {TEXT PROMPT FROM USER}",
+  "parameters": {
+    "decoding_method": "greedy",
+    "max_new_tokens": 8192,
+    "min_new_tokens": 10,
+    "stop_sequences": ["]", "}"],
+    "temperature": 0.1
+  }
+}
+
+
+B. Vision and Mixed Tasks (e.g., "Add this receipt")
+For multimodal tasks, the input string must be preceded by the Base64 representation of the image. The model ID must be updated to support vision (e.g., Llama 3.2).
+{
+  "model_id": "meta-llama/llama-3.2-90b-instruct-vision-001",
+  "input": "data:image/jpeg;base64,{BASE64_IMAGE_STRING}\n\nCurrent JSON Dataset:\n\n{FULL JSON CONTENT UPLOADED BY USER}\n\nUser Command: {TEXT PROMPT OR INSTRUCTION}",
+  "parameters": {
+    "decoding_method": "sampling",
+    "max_new_tokens": 8192,
+    "min_new_tokens": 10,
+    "temperature": 0.5 
+  }
+}
+
+
+C. Full Example Payload (Simplified)
+This example shows the payload for a text-only modification request.
+{
+  "model_id": "ibm/granite-3.0-8b-instruct",
+  "input": "Current JSON Dataset:\n\n[\n  {\"id\": \"1\", \"description\": \"Old item\", \"amount\": 100}\n]\n\nUser Command: Create a new item with description 'New Server' and amount 500.",
+  "parameters": {
+    "decoding_method": "greedy",
+    "max_new_tokens": 8192,
+    "min_new_tokens": 10,
+    "temperature": 0.1
+  }
+}
+
+
+11.3 Response Contract and Post-Processing
+The API returns a JSON object containing an array of predictions. The Vercel Proxy must extract the plain text content from the first prediction and process it.
+Expected Successful Response Structure
+{
+  "model_id": "ibm/granite-3.0-8b-instruct",
+  "created_at": "2025-11-22T08:00:00.000Z",
+  "results": [
+    {
+      "generated_text": "{JSON_OUTPUT_AS_PER_AGENT_INSTRUCTIONS}",
+      "input_token_count": 500,
+      "generated_token_count": 80
+    }
+  ]
+}
+
+
+Required Post-Processing by Vercel Proxy
+1. Extraction: Extract the content of results[0].generated_text.
+2. Schema Check: The extracted text must be parsed using JSON.parse().
+3. Client Response: Vercel Proxy returns the parsed JSON object directly to the client (PWA).
+11.4 Constraints and Error Handling
+Constraint/Limitation
+	Specification
+	Impact on Vercel Proxy
+	Max Token Output
+	Recommended 8192 tokens.
+	Limits the size of the returned JSON dataset. Numeri should warn user if upload exceeds what can be processed.
+	Vercel Payload Limit
+	~4.5 MB (for Serverless Function body).
+	All Base64 images + JSON context must be under this limit. This is the ultimate file size constraint for uploads.
+	Model Failure (Error)
+	IBM returns HTTP 400 or 500 status code with detailed error object.
+	Proxy must catch non-200 status codes. Forward generic error message to client: "Error processing request on IBM watsonx. Please try again."
+	Timeout
+	Vercel Function timeout is 30s.
+	Vision tasks must complete inference within this window. Proxy should implement a simple retry mechanism or fail gracefully.
+	Input Token Count
+	Max tokens limit depends on the specific model (e.g., Granite 3.0).
+	Proxy must calculate the approximate token count of the input (user prompt + full JSON file) and refuse large uploads proactively if it exceeds model context window.
