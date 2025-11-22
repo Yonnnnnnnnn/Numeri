@@ -1,18 +1,18 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
 /**
- * Vercel Serverless Function: IBM watsonx Orchestrate Proxy
+ * Vercel Serverless Function: Hybrid AI System (IBM Watsonx + Google Gemini)
  * 
- * This function acts as a secure proxy between the Numeri frontend and IBM watsonx.
- * It handles:
- * - IAM token generation and rotation
- * - Request payload construction
- * - Response parsing and validation
- * - Error handling and logging
+ * This function implements a skill-routing architecture:
+ * - Vision Tasks (Image Processing): IBM Watsonx (Hackathon Core Requirement)
+ * - Complex Logic/Accounting: Google Gemini 1.5 Flash (High Intelligence)
  * 
  * Environment Variables Required:
  * - IBM_CLOUD_API_KEY: IBM Cloud API key for authentication
  * - IBM_PROJECT_ID: IBM Cloud project ID for billing/isolation
  * - IBM_REGION: IBM Cloud region (e.g., us-south)
  * - IBM_WATSONX_HOST: watsonx API host
+ * - GEMINI_API_KEY: Google Gemini API key for text/logic tasks
  */
 
 export default async function handler(req, res) {
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { currentData, imageBase64, prompt, isVisionTask } = req.body;
+    const { currentData, imageBase64, prompt } = req.body;
 
     // Validate payload size (Vercel limit: 4.5MB)
     const payloadSize = JSON.stringify(req.body).length;
@@ -32,40 +32,120 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 1: Generate IAM Token
-    const iamToken = await generateIAMToken(process.env.IBM_CLOUD_API_KEY);
+    let result;
 
-    // Step 2: Construct watsonx API request
-    const watsonxPayload = constructPayload(
-      currentData,
-      imageBase64,
-      prompt,
-      isVisionTask
-    );
+    // SKILL ROUTING: Check if this is a vision task
+    if (imageBase64) {
+      // Vision Task: Use IBM Watsonx
+      console.log('Routing to IBM Watsonx for vision task...');
+      result = await handleVisionTask(currentData, imageBase64, prompt);
+    } else {
+      // Text/Logic Task: Use Google Gemini 1.5 Flash
+      console.log('Routing to Gemini 1.5 Flash for logic task...');
+      result = await handleLogicTask(currentData, prompt);
+    }
 
-    // Step 3: Call IBM watsonx API
-    const watsonxResponse = await callWatsonxAPI(
-      iamToken,
-      watsonxPayload,
-      process.env.IBM_REGION,
-      process.env.IBM_WATSONX_HOST,
-      process.env.IBM_PROJECT_ID
-    );
-
-    // Step 4: Parse and validate response
-    const parsedResponse = parseWatsonxResponse(watsonxResponse);
-
-    // Step 5: Return to client
-    return res.status(200).json(parsedResponse);
+    // Return parsed JSON response
+    return res.status(200).json(result);
   } catch (error) {
-    console.error('Error in agent proxy:', error);
+    console.error('Error in hybrid AI agent:', error);
 
-    // Return generic error to client (don't expose internal details)
+    // Return error with details in development mode
     return res.status(500).json({
-      error: 'Error processing request on IBM watsonx. Please try again.',
+      error: 'Error processing request. Please try again.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
+}
+
+/**
+ * Handle Vision Tasks using IBM Watsonx
+ * Processes images for OCR, receipt extraction, etc.
+ */
+async function handleVisionTask(currentData, imageBase64, prompt) {
+  // Step 1: Generate IAM Token
+  const iamToken = await generateIAMToken(process.env.IBM_CLOUD_API_KEY);
+
+  // Step 2: Construct watsonx vision payload
+  const watsonxPayload = constructVisionPayload(currentData, imageBase64, prompt);
+
+  // Step 3: Call IBM watsonx API
+  const watsonxResponse = await callWatsonxAPI(
+    iamToken,
+    watsonxPayload,
+    process.env.IBM_REGION,
+    process.env.IBM_WATSONX_HOST,
+    process.env.IBM_PROJECT_ID
+  );
+
+  // Step 4: Parse and validate response
+  return parseWatsonxResponse(watsonxResponse);
+}
+
+/**
+ * Handle Logic/Accounting Tasks using Google Gemini 1.5 Flash
+ * Processes complex business logic, accounting, and data transformations
+ */
+async function handleLogicTask(currentData, userPrompt) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+  const dataContext = JSON.stringify(currentData, null, 2);
+
+  const systemPrompt = `You are Numeri, an Expert AI Accountant.
+
+Rules:
+1. **Double-Entry:** Translate user intent into strict Journal Entries (Debit/Credit).
+2. **Structure:** If user asks to change columns, restructure the JSON schema.
+3. **Math:** Calculate balances accurately.
+4. **Output:** Return ONLY the valid updated JSON dataset matching the schema.
+
+Current JSON Dataset:
+${dataContext}
+
+User Command: ${userPrompt}
+
+Return ONLY this JSON structure (no markdown, no explanations outside JSON):
+{
+  "filename": "transactions_updated.json",
+  "content": [array of updated rows],
+  "explanation": "Penjelasan perubahan dalam Bahasa Indonesia"
+}`;
+
+  const response = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.3,
+      maxOutputTokens: 4096,
+    },
+  });
+
+  const responseText = response.response.text();
+
+  // Parse the JSON response
+  let parsedJSON;
+  try {
+    parsedJSON = JSON.parse(responseText);
+  } catch (e) {
+    // If direct parse fails, try to extract JSON from the text
+    const jsonMatch = responseText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('No valid JSON found in Gemini response');
+    }
+    parsedJSON = JSON.parse(jsonMatch[0]);
+  }
+
+  // Validate structure
+  if (!parsedJSON.content || !Array.isArray(parsedJSON.content)) {
+    throw new Error('Gemini response missing required "content" array');
+  }
+
+  return {
+    filename: parsedJSON.filename || 'transactions_updated.json',
+    content: parsedJSON.content,
+    explanation: parsedJSON.explanation || 'Processing complete.',
+  };
 }
 
 /**
@@ -95,15 +175,13 @@ async function generateIAMToken(apiKey) {
 }
 
 /**
- * Construct watsonx API payload
- * Supports both text-only and vision tasks
+ * Construct watsonx API payload for vision tasks
+ * Uses Llama 3.2 90B Vision for image processing
  */
-function constructPayload(currentData, imageBase64, prompt, isVisionTask) {
+function constructVisionPayload(currentData, imageBase64, prompt) {
   const dataContext = JSON.stringify(currentData, null, 2);
 
-  if (isVisionTask && imageBase64) {
-    // Vision task: Include base64 image
-    const visionPrompt = `You are a receipt/invoice data extraction expert. Extract information from the image and add it to the dataset.
+  const visionPrompt = `You are a receipt/invoice data extraction expert. Extract information from the image and add it to the dataset.
 
 Current JSON Dataset:
 ${dataContext}
@@ -119,63 +197,16 @@ IMPORTANT: Return ONLY valid JSON with this exact structure:
 
 Image: ${imageBase64}`;
 
-    return {
-      model_id: 'meta-llama/llama-3-2-90b-instruct-vision-001',
-      input: visionPrompt,
-      parameters: {
-        decoding_method: 'sampling',
-        max_new_tokens: 4096,
-        min_new_tokens: 50,
-        temperature: 0.3,
-      },
-    };
-  } else {
-    // Text-only task with improved prompt
-    const systemPrompt = `You are a spreadsheet data processing AI. You modify JSON data based on user commands.
-
-RULES:
-1. ALWAYS return the COMPLETE array (not just changes), UNLESS it is a filtering request.
-2. Preserve the column structure and property names exactly as they are.
-3. Return ONLY valid JSON, no markdown, no explanations outside JSON.
-4. Use Bahasa Indonesia for the explanation field.
-5. CRITICAL: IDs are IMMUTABLE. If user asks to change/edit an ID value, IGNORE that specific request and explain in the explanation that IDs cannot be changed.
-6. CRITICAL: If adding new data, ALWAYS append it to the END of the array.
-7. FILTERING: If user asks to "filter", "show only", "find", or "search" specific data:
-   - Set "isFilterView": true in the response
-   - Return ONLY the rows that match the criteria in the "content" array
-   - Do NOT return the full dataset
-
-JSON Response Structure:
-{
-  "content": [ ... ],
-  "explanation": "...",
-  "isFilterView": true/false
-}
-
-Current JSON Dataset:
-${dataContext}
-
-User Command: ${prompt}
-
-Return ONLY this JSON structure:
-{
-  "filename": "transactions_updated.json",
-  "content": [complete array OR filtered subset],
-  "explanation": "Penjelasan perubahan dalam Bahasa Indonesia",
-  "isFilterView": boolean
-}`;
-
-    return {
-      model_id: 'ibm/granite-3-8b-instruct',
-      input: systemPrompt,
-      parameters: {
-        decoding_method: 'greedy',
-        max_new_tokens: 4096,
-        min_new_tokens: 50,
-        temperature: 0.1,
-      },
-    };
-  }
+  return {
+    model_id: 'meta-llama/llama-3-2-90b-instruct-vision-001',
+    input: visionPrompt,
+    parameters: {
+      decoding_method: 'sampling',
+      max_new_tokens: 4096,
+      min_new_tokens: 50,
+      temperature: 0.3,
+    },
+  };
 }
 
 /**
