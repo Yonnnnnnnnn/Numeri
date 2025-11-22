@@ -250,8 +250,8 @@ function constructVisionPayload(imageBase64, prompt) {
   // Compress image to reduce token count
   const optimizedImage = compressImageBase64(imageBase64);
   
-  // Ultra-minimal text prompt - base64 still needed for current API structure
-  const visionPrompt = `JSON output: date, amount, description, category. Image: ${optimizedImage}`;
+  // Ultra-minimal text prompt with strict JSON instructions
+  const visionPrompt = `Output valid JSON only. Do not include any conversational text. Do not use Markdown formatting. Start with { and end with }. Image: ${optimizedImage}`;
 
   return {
     model_id: 'meta-llama/llama-3-2-11b-vision-instruct',
@@ -321,28 +321,57 @@ function parseVisionResponse(response) {
   }
 
   const generatedText = response.results[0].generated_text;
+  
+  // DEBUG: Log raw response for debugging
+  console.log("RAW_IBM_RESPONSE:", generatedText);
 
-  // Parse the single transaction object from the model
-  let transaction;
   try {
-    transaction = JSON.parse(generatedText);
-  } catch (e) {
-    // If direct parse fails, try to extract JSON from the text
-    const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No valid JSON found in vision response');
+    // Remove markdown code blocks
+    let cleanText = generatedText.replace(/```json/g, "").replace(/```/g, "");
+    
+    // Extract JSON part between first { and last }
+    const startIndex = cleanText.indexOf('{');
+    const endIndex = cleanText.lastIndexOf('}');
+    
+    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+      cleanText = cleanText.substring(startIndex, endIndex + 1);
+      
+      // Parse the JSON
+      const transaction = JSON.parse(cleanText);
+      
+      // Validate and normalize transaction structure
+      return {
+        id: Date.now().toString(), // Generate unique ID
+        date: transaction.date || new Date().toISOString().split('T')[0],
+        amount: parseFloat(transaction.amount) || 0,
+        description: transaction.description || 'Receipt',
+        category: transaction.category || 'expense'
+      };
     }
-    transaction = JSON.parse(jsonMatch[0]);
+    
+    throw new Error("No JSON brackets found in response");
+    
+  } catch (error) {
+    // Fallback: Try regex extraction as last resort
+    try {
+      const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const transaction = JSON.parse(jsonMatch[0]);
+        return {
+          id: Date.now().toString(),
+          date: transaction.date || new Date().toISOString().split('T')[0],
+          amount: parseFloat(transaction.amount) || 0,
+          description: transaction.description || 'Receipt',
+          category: transaction.category || 'expense'
+        };
+      }
+    } catch (fallbackError) {
+      // Fallback failed too
+    }
+    
+    // Include raw text snippet in error for debugging
+    throw new Error(`Failed to parse JSON from vision response. Raw text snippet: "${generatedText.substring(0, 100)}..." Error: ${error.message}`);
   }
-
-  // Validate and normalize transaction structure
-  return {
-    id: Date.now().toString(), // Generate unique ID
-    date: transaction.date || new Date().toISOString().split('T')[0],
-    amount: parseFloat(transaction.amount) || 0,
-    description: transaction.description || 'Receipt',
-    category: transaction.category || 'expense'
-  };
 }
 
 /**
