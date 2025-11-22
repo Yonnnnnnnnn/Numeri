@@ -1,0 +1,407 @@
+{
+    "openapi": "3.0.1",
+    "info": {
+        "title": "Numeri AI Spreadsheet Agent API",
+        "description": "Complete CRUD API for IBM watsonx Agent to manage spreadsheet data with AI capabilities",
+        "version": "2.0.0",
+        "contact": {
+            "name": "Numeri Development Team",
+            "url": "https://github.com/Yonnnnnnnnn/Numeri"
+        }
+    },
+    "servers": [
+        {
+            "url": "https://numeri.vercel.app/api",
+            "description": "Production"
+        },
+        {
+            "url": "http://localhost:3000/api",
+            "description": "Development"
+        }
+    ],
+    "paths": {
+        "/agent": {
+            "post": {
+                "summary": "Process data with AI (Create/Add)",
+                "description": "AI-powered data processing with vision and text support",
+                "operationId": "processSpreadsheetData",
+                "tags": [
+                    "AI Processing"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProcessRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProcessResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/data": {
+            "get": {
+                "summary": "Read spreadsheet data",
+                "description": "Get current spreadsheet state",
+                "operationId": "readSpreadsheetData",
+                "tags": [
+                    "Data Operations"
+                ],
+                "parameters": [
+                    {
+                        "name": "filename",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReadResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "summary": "Update specific rows/cells",
+                "description": "Apply targeted updates using JSON Patch operations",
+                "operationId": "patchSpreadsheetData",
+                "tags": [
+                    "Data Operations"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PatchResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete rows",
+                "description": "Remove specific rows by index or filter",
+                "operationId": "deleteSpreadsheetRows",
+                "tags": [
+                    "Data Operations"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeleteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeleteResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ProcessRequest": {
+                "type": "object",
+                "required": [
+                    "currentData",
+                    "prompt"
+                ],
+                "properties": {
+                    "currentData": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        },
+                        "example": [
+                            {
+                                "col_0": "2023-11-22",
+                                "col_1": "IBM",
+                                "col_2": 1500000
+                            }
+                        ]
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "example": "Add new expense for coffee 45000"
+                    },
+                    "imageBase64": {
+                        "type": "string",
+                        "format": "byte"
+                    },
+                    "isVisionTask": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "columnNames": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "Date",
+                            "Description",
+                            "Amount"
+                        ]
+                    }
+                }
+            },
+            "ProcessResponse": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string"
+                    },
+                    "content": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "explanation": {
+                        "type": "string"
+                    },
+                    "rowsAdded": {
+                        "type": "integer"
+                    },
+                    "rowsModified": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "ReadResponse": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string"
+                    },
+                    "content": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "columnNames": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "rowCount": {
+                        "type": "integer"
+                    },
+                    "columnCount": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "PatchRequest": {
+                "type": "object",
+                "required": [
+                    "operations"
+                ],
+                "properties": {
+                    "operations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "op",
+                                "path"
+                            ],
+                            "properties": {
+                                "op": {
+                                    "type": "string",
+                                    "enum": [
+                                        "replace",
+                                        "add",
+                                        "remove"
+                                    ]
+                                },
+                                "path": {
+                                    "type": "string",
+                                    "example": "/2/col_2"
+                                },
+                                "value": {
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        "example": [
+                            {
+                                "op": "replace",
+                                "path": "/2/col_2",
+                                "value": 150000
+                            },
+                            {
+                                "op": "add",
+                                "path": "/-",
+                                "value": {
+                                    "col_0": "new",
+                                    "col_1": "row"
+                                }
+                            }
+                        ]
+                    },
+                    "explanation": {
+                        "type": "string"
+                    }
+                }
+            },
+            "PatchResponse": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "content": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "operationsApplied": {
+                        "type": "integer"
+                    },
+                    "explanation": {
+                        "type": "string"
+                    }
+                }
+            },
+            "DeleteRequest": {
+                "type": "object",
+                "properties": {
+                    "rowIndices": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "example": [
+                            2,
+                            5,
+                            7
+                        ]
+                    },
+                    "filter": {
+                        "type": "object",
+                        "properties": {
+                            "column": {
+                                "type": "string",
+                                "example": "col_4"
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "equals",
+                                    "contains",
+                                    "greaterThan",
+                                    "lessThan"
+                                ]
+                            },
+                            "value": {}
+                        }
+                    },
+                    "explanation": {
+                        "type": "string"
+                    }
+                }
+            },
+            "DeleteResponse": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "content": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "rowsDeleted": {
+                        "type": "integer"
+                    },
+                    "explanation": {
+                        "type": "string"
+                    }
+                }
+            },
+            "Error": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string"
+                    },
+                    "details": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "AI Processing",
+            "description": "AI-powered operations"
+        },
+        {
+            "name": "Data Operations",
+            "description": "CRUD operations"
+        }
+    ]
+}

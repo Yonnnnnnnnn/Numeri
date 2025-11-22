@@ -1,0 +1,388 @@
+Product Requirements Document (PRD): Numeri - Interactive Spreadsheet Edition
+Edisi: IBM Agentic AI Hackathon (v5.0 - Interactive Spreadsheet Implementation)
+Tujuan: Proof of Concept (PoC) - AI-Powered Spreadsheet Data Architect
+Platform: Web Application (React 18 + Vite 4 + Tailwind CSS 3)
+Core Brain: IBM watsonx Orchestrate (Llama 3.2 Vision + Granite 3.0)
+Hosting: Vercel (Frontend + Serverless Proxy)
+Data Flow: Create/Upload → Interactive Edit → AI Process → Download
+UI Architecture: Three-Panel Layout (File Explorer | Spreadsheet Editor | AI Chat)
+
+1. Overview
+Numeri adalah aplikasi web interaktif berbasis AI untuk mengelola dan memproses data dalam format spreadsheet.
+Aplikasi ini menggabungkan kemudahan spreadsheet tradisional (seperti Excel/Google Sheets) dengan kekuatan AI untuk ekstraksi data dari gambar dan pemrosesan natural language.
+
+Dalam implementasi saat ini, Numeri menyediakan:
+- **Interactive Spreadsheet Editor** dengan kolom Excel-style (A, B, C, dst)
+- **File Management System** untuk multiple JSON datasets
+- **AI Chat Interface** untuk natural language commands dan vision processing
+- **Stateless Architecture** - data hanya tersimpan di browser session
+- **Real-time Editing** - semua perubahan langsung tersinkronisasi
+
+2. Tech Stack
+* Frontend: React 18.2 + Vite 4.4 + Tailwind CSS 3.3
+* UI Components: lucide-react 0.263.1 (icon library)
+* State Management: React Hooks (useState, useEffect, useRef) - In-Memory Buffer
+* Orchestration Engine: IBM watsonx Orchestrate (Agent Builder)
+* AI Models:
+   * Logic: IBM Granite 3.0 8B Instruct (JSON Construction)
+   * Vision: Llama 3.2 90B Vision (Receipt/Invoice Analysis)
+* Backend Proxy: Vercel Serverless Functions (Node.js) - /api/agent.js
+* File Handling: HTML5 File API + Blob download
+* Deployment: Vercel (Auto-deploy from GitHub)
+
+3. UI Architecture - Three-Panel Layout
+
+Numeri menggunakan arsitektur three-panel yang mengoptimalkan workflow data processing:
+
+┌─────────────────────────────────────────────────────────────┐
+│                    Numeri Application                        │
+├──────────┬──────────────────────────────┬───────────────────┤
+│          │                              │                   │
+│   FILE   │    SPREADSHEET EDITOR        │    AI CHAT        │
+│ EXPLORER │                              │   INTERFACE       │
+│          │                              │                   │
+│  (Left)  │         (Center)             │    (Right)        │
+│  256px   │         flex-1               │     384px         │
+└──────────┴──────────────────────────────┴───────────────────┘
+
+3.1 Left Panel: File Explorer (FileSidebar Component)
+* Width: 256px fixed
+* Features:
+  - Branding header dengan Numeri logo dan .json badge
+  - "New Data File" button untuk create file baru
+  - List semua files dalam project
+  - Active file highlighting (cyan background)
+  - Empty state dengan icon dan helpful message
+* State Management:
+  - files: Array of {name, content}
+  - activeFileName: String (currently selected file)
+
+3.2 Center Panel: Interactive Spreadsheet Editor (JsonGridEditor Component)
+* Width: Flexible (flex-1)
+* Features:
+  - **Excel-Style Column Headers**: A, B, C, D, ... (auto-generated)
+  - **Editable Column Names**: Click column header to rename (e.g., "Column 1" → "Date")
+  - **Add Column Button**: Menambah kolom baru di sebelah kanan
+  - **Add Row Button**: Menambah baris kosong di bawah
+  - **Editable Cells**: Semua cell bisa diedit langsung (inline editing)
+  - **Numeric Highlighting**: Angka ditampilkan hijau dan right-aligned
+  - **Row Numbering**: Auto-generated (1, 2, 3, ...)
+  - **Sticky Header**: Column headers tetap visible saat scroll
+  - **Empty State**: Pesan "No data yet. Click + Add Row to start"
+
+* Data Structure:
+  ```json
+  {
+    "col_0": "value1",
+    "col_1": "value2",
+    "col_2": "value3"
+  }
+  ```
+
+* Column Naming Algorithm:
+  ```javascript
+  getColumnLetter(0) → "A"
+  getColumnLetter(1) → "B"
+  getColumnLetter(25) → "Z"
+  getColumnLetter(26) → "AA"
+  ```
+
+3.3 Right Panel: AI Chat Interface (ChatInterface Component)
+* Width: 384px fixed
+* Features:
+  - Header dengan "AI Architect Agent" title dan green pulse indicator
+  - Chat history dengan user/assistant bubbles
+  - Text input field dengan Send button
+  - Image paste support (Ctrl+V) untuk receipt processing
+  - Processing indicator (animated dots)
+  - Model badge: "Gemini 2.5 Flash" (akan diganti dengan watsonx)
+  - Multimodal input ready indicator
+
+* Message Structure:
+  ```javascript
+  {
+    role: 'user' | 'assistant',
+    content: 'string',
+    image: 'base64_string' // optional
+  }
+  ```
+
+3.4 Top Bar (per file)
+* Height: 56px
+* Features:
+  - Active filename display (cyan color, monospace font)
+  - "Data Grid View" badge
+  - Undo button (mock)
+  - Delete file button (red, with confirmation)
+  - Save button (green, untuk manual save)
+
+4. User Flow Scenarios (Current Implementation)
+
+Skenario A: "Membuat Spreadsheet Baru"
+1. User membuka Numeri (empty state)
+2. Klik "New Data File" → Prompt untuk nama file
+3. File baru dibuat dengan 3 kolom default (Column 1, 2, 3)
+4. User klik "+ Add Row" untuk menambah baris
+5. User edit cell langsung dengan klik
+6. User rename column dengan klik header
+7. User klik "Save" untuk download JSON
+
+Skenario B: "Digitalisasi Struk Belanja dengan AI Vision"
+1. User sudah punya file aktif (atau buat baru)
+2. User paste gambar struk (Ctrl+V) di chat interface
+3. Gambar muncul di chat bubble
+4. AI (watsonx) memproses gambar:
+   * Ekstrak tanggal, merchant, total amount
+   * Generate UUID untuk ID
+   * Tambah row baru ke spreadsheet
+5. User review hasil di spreadsheet editor
+6. User bisa edit manual jika perlu koreksi
+7. User download file JSON yang sudah diupdate
+
+Skenario C: "Modifikasi Data dengan Natural Language"
+1. User ketik command di chat: "Ubah amount di baris 3 jadi 150000"
+2. AI (watsonx) parse command dan update data
+3. Spreadsheet otomatis refresh dengan data baru
+4. User lihat perubahan langsung di grid
+5. User download jika sudah selesai
+
+5. Functional Requirements
+
+ID | Requirement | Deskripsi Teknis | Status
+---|-------------|------------------|--------
+FR-01 | Three-Panel Layout | Implementasi FileSidebar, JsonGridEditor, ChatInterface sebagai komponen terpisah | ✅ DONE
+FR-02 | Excel-Style Columns | Column headers A, B, C dengan algorithm getColumnLetter() | ✅ DONE
+FR-03 | Editable Column Names | Click-to-edit functionality dengan state editingColumn | ✅ DONE
+FR-04 | Add Column/Row | Buttons untuk menambah kolom dan baris baru | ✅ DONE
+FR-05 | Inline Cell Editing | Input fields di setiap cell dengan onChange handler | ✅ DONE
+FR-06 | File Management | Create, select, delete files dengan React state | ✅ DONE
+FR-07 | IBM watsonx Integration | API call ke /api/agent.js untuk AI processing | 🔄 IN PROGRESS
+FR-08 | Vision Processing | Base64 image upload dan processing via Llama 3.2 Vision | 🔄 IN PROGRESS
+FR-09 | Download JSON | Convert React state ke Blob dan trigger download | ⏳ TODO
+FR-10 | Upload JSON | Parse uploaded file dan load ke spreadsheet | ⏳ TODO
+
+6. IBM watsonx Integration Architecture
+
+6.1 Backend: Vercel Serverless Function (/api/agent.js)
+* Endpoint: POST /api/agent
+* Authentication: IAM Token generation using IBM_CLOUD_API_KEY
+* Request Body:
+  ```json
+  {
+    "currentData": [...],
+    "prompt": "string",
+    "imageBase64": "data:image/jpeg;base64,...",
+    "isVisionTask": boolean
+  }
+  ```
+* Response:
+  ```json
+  {
+    "filename": "transactions_updated.json",
+    "content": [...],
+    "explanation": "Added 1 receipt from image."
+  }
+  ```
+
+6.2 Frontend Integration Points
+* handleSendMessage() - Call watsonx API dengan text prompt
+* handlePaste() - Process image paste dan call vision API
+* handleUpdateFileContent() - Sync AI response dengan file state
+
+6.3 Environment Variables (Vercel)
+```
+IBM_CLOUD_API_KEY=ApiKey-7e441bd4-95fd-420c-85ba-887cb8c576bc
+IBM_PROJECT_ID=<to_be_obtained>
+IBM_REGION=<to_be_obtained>
+IBM_WATSONX_HOST=ml.cloud.ibm.com
+```
+
+7. Data Schema
+
+7.1 File State Structure
+```javascript
+const files = [
+  {
+    name: "transactions.json",
+    content: JSON.stringify([...])
+  }
+]
+```
+
+7.2 Spreadsheet Data Structure
+```json
+[
+  {
+    "col_0": "2023-11-22",
+    "col_1": "IBM Cloud Credits",
+    "col_2": "1500000"
+  }
+]
+```
+
+7.3 AI Response Schema (watsonx)
+```json
+{
+  "filename": "transactions_updated.json",
+  "content": [
+    {
+      "id": "uuid-generated",
+      "date": "YYYY-MM-DD",
+      "description": "string",
+      "amount": number,
+      "category": "string",
+      "type": "income|expense"
+    }
+  ],
+  "explanation": "Added 1 receipt from image."
+}
+```
+
+8. Component Architecture
+
+8.1 App.jsx (Main Component)
+* State:
+  - files: Array<{name, content}>
+  - activeFileName: string | null
+  - messages: Array<{role, content, image?}>
+  - isProcessing: boolean
+* Handlers:
+  - handleCreateFile()
+  - handleDeleteFile()
+  - handleSendMessage()
+  - handleUpdateFileContent()
+  - handlePaste (useEffect)
+
+8.2 FileSidebar Component
+* Props: files, activeFile, onSelectFile, onCreateFile
+* Features: File list, active highlighting, empty state
+
+8.3 JsonGridEditor Component
+* Props: content, onUpdateContent
+* State:
+  - parsedData: Array<Object>
+  - columnNames: Array<string>
+  - editingColumn: number | null
+  - error: string | null
+* Features: 
+  - Column letter generation
+  - Editable headers
+  - Editable cells
+  - Add column/row buttons
+
+8.4 ChatInterface Component
+* Props: messages, onSendMessage, isProcessing
+* State: input (text field value)
+* Features:
+  - Chat bubbles (user/assistant)
+  - Image preview
+  - Processing indicator
+  - Auto-scroll to bottom
+
+9. Non-Functional Requirements
+
+9.1 Performance
+* Client-Side Rendering: React renders spreadsheet in <100ms for files <1MB
+* AI Response Time: watsonx should respond within 5-10 seconds
+* Optimistic Updates: Show loading state immediately on user action
+
+9.2 Security
+* Zero-State: No server-side data storage
+* API Key Protection: IBM credentials stored in Vercel env vars only
+* Payload Validation: Max 4.5MB (Vercel limit)
+
+9.3 Usability
+* Empty States: Helpful messages when no files/data
+* Error Handling: User-friendly error messages
+* Keyboard Support: Enter to save, Escape to cancel editing
+* Visual Feedback: Hover states, active states, loading indicators
+
+10. Acceptance Criteria & Success Metrics
+
+Acceptance Criteria (MVP):
+1. ✅ User dapat create file baru dengan nama custom
+2. ✅ User dapat add/edit columns dan rows di spreadsheet
+3. ✅ Column headers menampilkan A, B, C (Excel-style)
+4. ✅ Numeric values highlighted dengan warna hijau
+5. 🔄 User dapat paste gambar struk dan AI ekstrak data
+6. 🔄 User dapat kirim text command dan AI update data
+7. ⏳ User dapat download file JSON hasil editing
+8. ⏳ User dapat upload file JSON existing
+
+Success Metrics:
+1. Demo Smoothness: Presentasi tanpa crash atau lag
+2. AI Accuracy: 3/3 receipt extraction berhasil dengan benar
+3. UX Quality: Juri memberikan feedback positif tentang UI/UX
+4. Code Quality: Repository clean, well-documented, no hardcoded secrets
+
+11. Implementation Roadmap
+
+Phase 1: UI Foundation ✅ COMPLETED
+- Three-panel layout
+- Spreadsheet editor dengan Excel-style columns
+- File management system
+- Chat interface mockup
+
+Phase 2: IBM watsonx Integration 🔄 IN PROGRESS
+- Setup IBM Cloud credentials
+- Implement /api/agent.js serverless function
+- Connect frontend to watsonx API
+- Test text and vision tasks
+
+Phase 3: File Operations ⏳ NEXT
+- Implement JSON download
+- Implement JSON upload
+- File validation and error handling
+
+Phase 4: Polish & Deploy ⏳ UPCOMING
+- Error handling improvements
+- Loading states refinement
+- Vercel deployment
+- Demo preparation
+
+12. Technical Debt & Future Enhancements
+
+Current Limitations:
+- Mock AI responses (using setTimeout)
+- No file upload functionality yet
+- No download functionality yet
+- Column rename tidak persist ke JSON keys
+- No undo/redo functionality
+
+Future Enhancements:
+- Real-time collaboration (WebSocket)
+- Export to CSV/Excel formats
+- Advanced data validation
+- Custom column types (date picker, dropdown, etc.)
+- Keyboard shortcuts (Ctrl+Z, Ctrl+S, etc.)
+- Dark/Light theme toggle
+- Mobile responsive design
+
+13. Deployment Checklist
+
+Pre-Deployment:
+- [ ] Obtain IBM Cloud credentials (API Key, Project ID, Region)
+- [ ] Configure Vercel environment variables
+- [ ] Test watsonx API integration locally
+- [ ] Implement file download functionality
+- [ ] Add error boundaries for React components
+- [ ] Test with sample receipt images
+
+Deployment:
+- [ ] Push to GitHub main branch
+- [ ] Vercel auto-deploy triggered
+- [ ] Verify environment variables in Vercel dashboard
+- [ ] Test production URL
+- [ ] Prepare demo script and assets
+
+Post-Deployment:
+- [ ] Monitor Vercel logs for errors
+- [ ] Test all user flows end-to-end
+- [ ] Prepare presentation slides
+- [ ] Record demo video (backup)
+
+---
+
+Document Version: 5.0
+Last Updated: 2025-11-22
+Status: Living Document (Updated based on implementation progress)

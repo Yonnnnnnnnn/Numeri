@@ -1,0 +1,88 @@
+{
+    "columns": [
+        "id",
+        "Deskripsi",
+        "Kategori",
+        "Jumlah (IDR)"
+    ],
+    "rows": [
+        {
+            "id": 1,
+            "Deskripsi": "Pendapatan Penjualan Bersih",
+            "Kategori": "PENDAPATAN",
+            "Jumlah (IDR)": 150000000.00
+        },
+        {
+            "id": 2,
+            "Deskripsi": "Biaya Pokok Penjualan",
+            "Kategori": "BEBAN",
+            "Jumlah (IDR)": 50000000.00
+        },
+        {
+            "id": 3,
+            "Deskripsi": "LABA KOTOR",
+            "Kategori": "HITUNGAN",
+            "Jumlah (IDR)": 100000000.00
+        },
+        {
+            "id": 4,
+            "Deskripsi": "Beban Gaji Karyawan",
+            "Kategori": "BEBAN OPERASIONAL",
+            "Jumlah (IDR)": 25000000.00
+        },
+        {
+            "id": 5,
+            "Deskripsi": "Beban Sewa Kantor",
+            "Kategori": "BEBAN OPERASIONAL",
+            "Jumlah (IDR)": 5000000.00
+        },
+        {
+            "id": 6,
+            "Deskripsi": "Beban Pemasaran & Iklan",
+            "Kategori": "BEBAN OPERASIONAL",
+            "Jumlah (IDR)": 10000000.00
+        },
+        {
+            "id": 7,
+            "Deskripsi": "Total Beban Operasional",
+            "Kategori": "HITUNGAN",
+            "Jumlah (IDR)": 40000000.00
+        },
+        {
+            "id": 8,
+            "Deskripsi": "LABA OPERASI",
+            "Kategori": "HITUNGAN",
+            "Jumlah (IDR)": 60000000.00
+        },
+        {
+            "id": 9,
+            "Deskripsi": "Beban Bunga Pinjaman",
+            "Kategori": "NON-OPERASIONAL",
+            "Jumlah (IDR)": 5000000.00
+        },
+        {
+            "id": 10,
+            "Deskripsi": "Laba Penjualan Aset",
+            "Kategori": "NON-OPERASIONAL",
+            "Jumlah (IDR)": -1000000.00
+        },
+        {
+            "id": 11,
+            "Deskripsi": "Laba (Rugi) Sebelum Pajak",
+            "Kategori": "HITUNGAN",
+            "Jumlah (IDR)": 56000000.00
+        },
+        {
+            "id": 12,
+            "Deskripsi": "Beban Pajak Penghasilan",
+            "Kategori": "PAJAK",
+            "Jumlah (IDR)": 12000000.00
+        },
+        {
+            "id": 13,
+            "Deskripsi": "LABA BERSIH",
+            "Kategori": "FINAL",
+            "Jumlah (IDR)": 44000000.00
+        }
+    ]
+}
