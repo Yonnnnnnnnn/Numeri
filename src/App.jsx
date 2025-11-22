@@ -560,7 +560,7 @@ export default function App() {
   };
 
   // Compress image before sending to backend
-  const compressImage = (base64Image, maxWidth = 512, quality = 0.5) => {
+  const compressImage = (base64Image, maxWidth = 600, quality = 0.5) => {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {

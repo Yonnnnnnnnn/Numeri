@@ -257,12 +257,15 @@ function constructOCRPayload(imageBase64) {
   // Compress image to reduce token count
   const optimizedImage = compressImageBase64(imageBase64);
   
+  // Remove "data:image/png;base64," header if present
+  const cleanBase64 = optimizedImage.replace(/^data:image\/\w+;base64,/, "");
+  
   // OCR-focused prompt - no JSON requirement
   const ocrPrompt = `<|begin_of_text|><|start_header_id|>user<|end_header_id|>
 
-${optimizedImage}
+${cleanBase64}
 
-Describe this image and transcribe all visible text. List the items, prices, dates, and merchant name clearly. Do not use JSON format.
+Describe the visible content of this receipt image. Ignore any technical headers or file encoding text. Transcribe the date, total amount, and merchant name.
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 `;
