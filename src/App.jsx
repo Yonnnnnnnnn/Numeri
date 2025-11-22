@@ -347,21 +347,14 @@ export default function App() {
       let convertedContent = fileContent;
 
       if (!Array.isArray(parsedData) && parsedData.rows && Array.isArray(parsedData.rows)) {
-        // Object with rows property - convert to array with col_0, col_1 format
-        const convertedRows = parsedData.rows.map(row => {
-          const newRow = {};
-          const keys = Object.keys(row);
-          keys.forEach((key, index) => {
-            newRow[`col_${index}`] = row[key];
-          });
-          return newRow;
-        });
+        // Object with rows property - extract rows array directly
+        const convertedRows = parsedData.rows;
 
         convertedContent = JSON.stringify(convertedRows, null, 2);
 
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: `🔄 File dikonversi dari format object (columns/rows) ke format array. ${parsedData.rows.length} baris data terdeteksi.`
+          content: `🔄 File format object (columns/rows) terdeteksi. Mengambil ${parsedData.rows.length} baris data.`
         }]);
       } else if (!Array.isArray(parsedData)) {
         setMessages(prev => [...prev, {
