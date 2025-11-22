@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Folder, FileJson, Save, Send, Image as ImageIcon, Settings, Menu, RotateCcw, Trash2, Plus, X, Server, History } from 'lucide-react';
+import { Folder, FileJson, Save, Send, Image as ImageIcon, Settings, Menu, RotateCcw, Trash2, Plus, X, Server } from 'lucide-react';
 
 // --- MOCK DATA & UTILS ---
 
@@ -185,29 +185,23 @@ export default function App() {
     { role: 'assistant', content: 'Halo! Saya AI Architect. Silakan paste gambar laporan atau beri instruksi untuk mengubah data.' }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [fileHistory, setFileHistory] = useState([]); // Array of { fileName, content, description, timestamp }
+  const [fileHistory, setFileHistory] = useState({});
   const [showHistory, setShowHistory] = useState(false);
 
   // Derived State
   const activeFile = files.find(f => f.name === activeFileName);
 
   // Handlers
-  // Handlers
-  const handleUpdateFileContent = (newContent, description = "Update data") => {
-    const currentFile = files.find(f => f.name === activeFileName);
-    if (currentFile) {
-      // Add to history
+  const handleUpdateFileContent = (newContent, description = "Manual update") => {
+    if (activeFileName) {
       setFileHistory(prev => {
-        const newHistory = [
-          {
-            fileName: activeFileName,
-            content: currentFile.content,
-            description: description,
-            timestamp: Date.now()
-          },
-          ...prev
-        ].slice(0, 8); // Keep max 8
-        return newHistory;
+        const history = prev[activeFileName] || [];
+        const newEntry = {
+          content: activeFile.content,
+          description: description,
+          timestamp: new Date().toLocaleTimeString()
+        };
+        return { ...prev, [activeFileName]: [newEntry, ...history].slice(0, 8) };
       });
     }
 
@@ -217,18 +211,17 @@ export default function App() {
     setFiles(updatedFiles);
   };
 
-  const handleRollback = (historyItem) => {
-    if (window.confirm(`Rollback ke versi: ${historyItem.description}?`)) {
-      const updatedFiles = files.map(f =>
-        f.name === historyItem.fileName ? { ...f, content: historyItem.content } : f
-      );
-      setFiles(updatedFiles);
-      setShowHistory(false);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `✅ Berhasil rollback ke versi: ${historyItem.description}`
-      }]);
-    }
+  const handleRollback = (entry) => {
+    if (!entry) return;
+    const updatedFiles = files.map(f =>
+      f.name === activeFileName ? { ...f, content: entry.content } : f
+    );
+    setFiles(updatedFiles);
+    setShowHistory(false);
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `✅ Berhasil rollback ke versi: ${entry.description} (${entry.timestamp})`
+    }]);
   };
 
   const handleSendMessage = async (text) => {
@@ -291,7 +284,7 @@ export default function App() {
       // Update file content with AI result
       if (result.content && Array.isArray(result.content)) {
         const updatedContent = JSON.stringify(result.content, null, 2);
-        handleUpdateFileContent(updatedContent, result.explanation || "AI Update");
+        handleUpdateFileContent(updatedContent, text);
 
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -560,31 +553,30 @@ export default function App() {
             <div className="relative">
               <button
                 onClick={() => setShowHistory(!showHistory)}
-                className={`p-2 rounded-lg transition-colors ${fileHistory.filter(h => h.fileName === activeFileName).length > 0 ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
-                title="Rollback History"
-                disabled={fileHistory.filter(h => h.fileName === activeFileName).length === 0}
+                className={`p-2 rounded-lg transition-colors ${activeFile && fileHistory[activeFileName]?.length > 0 ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-700 cursor-not-allowed'}`}
+                disabled={!activeFile || !fileHistory[activeFileName]?.length}
+                title="History & Rollback"
               >
                 <RotateCcw size={18} />
               </button>
-              {showHistory && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                  <div className="p-3 border-b border-slate-700 text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                    <span>History (Max 8)</span>
-                    <button onClick={() => setShowHistory(false)}><X size={12} /></button>
+
+              {showHistory && activeFile && fileHistory[activeFileName]?.length > 0 && (
+                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="p-2 border-b border-slate-700 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Version History
                   </div>
                   <div className="max-h-64 overflow-y-auto">
-                    {fileHistory.filter(h => h.fileName === activeFileName).map((item, idx) => (
+                    {fileHistory[activeFileName].map((entry, idx) => (
                       <button
                         key={idx}
-                        onClick={() => handleRollback(item)}
+                        onClick={() => handleRollback(entry)}
                         className="w-full text-left p-3 hover:bg-slate-700 border-b border-slate-700/50 last:border-0 transition-colors group"
                       >
-                        <div className="text-xs text-cyan-400 font-mono mb-1">
-                          {new Date(item.timestamp).toLocaleTimeString()}
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-xs font-mono text-cyan-400">{entry.timestamp}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-900 rounded text-slate-500 group-hover:text-white transition-colors">Restore</span>
                         </div>
-                        <div className="text-sm text-slate-300 group-hover:text-white line-clamp-2">
-                          {item.description}
-                        </div>
+                        <p className="text-xs text-slate-300 line-clamp-2">{entry.description}</p>
                       </button>
                     ))}
                   </div>
