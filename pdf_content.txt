@@ -1,0 +1,659 @@
+
+
+===== PAGE 1 =====
+
+Agentic AI Hackathon
+with IBM watsonx
+Orchestrate
+
+===== PAGE 2 =====
+
+Hackathon Guide
+Agentic AI Hackathon with IBM watsonx
+Orchestrate
+AI agents are intelligent systems that can perceive their environment, reason about it, and take actions to
+achieve specific goals. These agents can operate autonomously or collaboratively, making them ideal for solving
+complex real-world problems.
+In this hackathon, you will design and build a proof-of-concept agentic AI solution using IBM watsonx
+Orchestrate – a no-code and low-code platform designed to orchestrate AI agents across business workflows.
+With watsonx Orchestrate, you can create, deploy, and manage intelligent assistants and agents that automate
+tasks, streamline processes, and enhance productivity.
+This hackathon guide will walk you through accessing watsonx technologies and building your solution.
+Contents
+Hackathon expectations............................................................ 3
+Note on data sets before you begin ....................................................................................................................... 3
+Get started with IBM watsonx...................................................... 4
+Note on available services ..................................................................................................................................... 4
+Note on preventing exposure of IBM Cloud credentials ....................................................................................... 4
+Request your hackathon IBM Cloud account ............................................................................................ 5
+Access your hackathon IBM Cloud account .............................................................................................. 6
+Accessing and utilizing IBM watsonx products ......................................................................................... 8
+1. IBM watsonx Orchestrate .................................................................................................................... 8
+Accessing watsonx Orchestrate ............................................................................................................................ 9
+Discover the catalog ............................................................................................................................................ 10
+Building agents .................................................................................................................................................... 10
+Expanding your agent’s capabilities: ................................................................................................................... 11
+Building AI assistants .......................................................................................................................................... 16
+Using agents in the chat....................................................................................................................................... 17
+Managing app connections .................................................................................................................................. 17
+Admin capabilities ............................................................................................................................................... 17
+watsonx Orchestrate API ..................................................................................................................................... 18
+Quick start hands-on exercises ........................................................................................................................... 18
+2. IBM watsonx.ai (OPTIONAL) .............................................................................................................. 19
+Note on IBM watsonx.ai service usage ................................................................................................................ 19
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 2
+
+===== PAGE 3 =====
+
+Hackathon Guide
+Note on available watsonx.ai services ................................................................................................................. 19
+Access Prompt Lab on watsonx.ai ....................................................................................................................... 20
+Work with the watsonx.ai Prompt Lab ................................................................................................................. 21
+Prompt Lab editor ................................................................................................................................................ 21
+Selecting an AI model .......................................................................................................................................... 21
+Programmatic access (API/SDK) ......................................................................................................................... 23
+watsonx.ai AI agent libraries and tutorials .......................................................................................................... 26
+Quick start hands-on exercises ........................................................................................................................... 26
+Save your Prompt Lab session ............................................................................................................................. 27
+Save your work on watsonx.ai ............................................................................................................................. 28
+Hackathon expectations
+In this hackathon, participants are expected to design and build a proof-of-concept AI agent solution using
+IBM watsonx Orchestrate to redefine how people and businesses get work done. The watsonx Orchestrate
+platform provides a robust foundation for creating and orchestrating intelligent AI agents and assistants.
+Leverage its capabilities to automate repetitive tasks, streamline workflows across tools, and empower
+employees to focus on high-value work.
+Participants may also optionally use the below listed watsonx product:
+• IBM watsonx.ai is a powerful AI studio that supports the development of agentic AI solutions using a
+wide range of foundation models. Through the Prompt Lab, participants can experiment with IBM’s
+Granite models and other leading models to create agents that understand and respond to natural
+language. IBM watsonx.ai can also serve as an inference provider for your agents, allowing them to
+generate responses, make decisions, and interact with users or systems intelligently.
+Note on using other technologies
+You may use any framework or technology to build your solution, provided you adhere to product usage policies.
+However, to be eligible for judging, your solution must showcase IBM watsonx Orchestrate as a core
+component.
+Note on data sets before you begin
+Participants are required to bring their own datasets to build the solution aligning to your use case. As you
+collect data for your project, you’ll want to use the best practices. Here are some helpful tips:
+• Teams are responsible for ensuring data is compliant.
+• Data from public websites may be used, if the terms allow for commercial use, but please keep a list of
+the websites you use.
+• Do not use data or assets containing company confidential data, or any other data without permission
+from the data owner. Teams are responsible for getting approval.
+• Do not use any client data.
+• Do not use any data containing personal information (PI).
+• Do not use data obtained from social media.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 3
+
+===== PAGE 4 =====
+
+Hackathon Guide
+Get started with IBM watsonx
+To access and use IBM watsonx products for this hackathon, participants must be registered for the hackathon,
+and request for a pre-configured IBM Cloud account. This account will provide the necessary environment to
+work with watsonx Orchestrate and other supporting products for this hackathon.
+You can follow the provided instructions to request and access your hackathon IBM Cloud account.
+Note on available services
+The IBM Cloud account provisioned for this hackathon is pre-configured with only the services required to
+complete the hackathon. You will not be able to configure any new service or modify permissions for existing
+ones due to restricted access. If you notice a permission/access issue for any service or the cloud catalog, then
+they are not required/available for this hackathon.
+The following optional IBM Cloud lite/trial services are provided for your hackathon solution building:
+• National Language Understanding
+• Speech-to-Text
+• Text-to-Speech
+• Cloudant
+Note on preventing exposure of IBM Cloud credentials
+Hackathon participants may use IBM Cloud credentials to build their solutions that leverage IBM technologies
+on IBM Cloud. During development, testing, collaboration, or while submitting their final project in a public
+repository, participants may unintentionally expose these credentials on publicly accessible platforms.
+Exposing IBM Cloud API keys or any cloud credentials can lead to unauthorized access, misuse of resources,
+and account suspension. If any IBM Cloud credential associated with your hackathon account is detected in a
+public repository or publicly accessible platform:
+• The credential will be deactivated immediately.
+• Your hackathon cloud account access will be suspended until you:
+1. Remove the exposed credential from all public sources. If you are using GitHub, you can refer to
+Removing sensitive data from a repository.
+2. Rotate and replace the exposed credential
+3. Confirm remediation with the hackathon support team and request access to your hackathon
+cloud account
+Please follow the Preventing exposure of IBM Cloud credentials in public repositories and platforms guide for
+best practices to avoid disruptions to your project and ensure the security of your IBM Cloud resources.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 4
+
+===== PAGE 5 =====
+
+Hackathon Guide
+Note on teaming
+If you are working as part of a team, please plan to collaborate using one team member’s cloud account. Adding
+or removing team members is not supported on the hackathon-provisioned IBM Cloud accounts.
+Request your hackathon IBM Cloud account
+Follow the steps below to request your cloud account:
+1. Access the hackathon’s IBM Cloud account request URL in your browser:
+https://www.ibm.com/account/reg/us-en/signup?formid=urx-54162.
+2. Create an IBMid if you have not already created one using the same email you used to register for the
+hackathon by completing the account information. Then click the “Next” button (If you already have an
+IBMid that uses the same email you used to register for the hackathon, proceed to log in, complete the
+authentication process and skip to step 4).
+3. Verify your email by entering the 7-digit code sent to your email and select the “Submit” button.
+4. Complete the IBM Cloud account request by verifying your name and email and click the “Request
+account” button.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 5
+
+===== PAGE 6 =====
+
+Hackathon Guide
+Note: If you see the message “Submission error Unable to verify registration,” it means you are not
+registered for the hackathon and cannot request a cloud account.
+5. Once your request is successfully submitted, you will receive an email invite to join the cloud account.
+Next, follow the Access your IBM Cloud account instructions to access your account.
+Access your hackathon IBM Cloud account
+After requesting a cloud account, participants will receive an email invite to join the cloud account. Follow the
+steps below to access your cloud account:
+1. Check the email inbox you used to register for the hackathon and open the email you received from the
+IBM Cloud team about joining your cloud account. Please check your junk/spam folders if you cannot
+find the email in your inbox. You can also search for “IBM Cloud” to locate the email.
+2. Click the Join Now button seen in that email. A new browser tab will open with the cloud account sign
+up page.
+3. Review your account and personal information. Read and accept the Account notice and click the Join
+Account button.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 6
+
+===== PAGE 7 =====
+
+Hackathon Guide
+4. Complete the authentication process by clicking the Continue button.
+5. After you authenticate successfully, you will be taken to the IBM Cloud dashboard.
+6. If you have an existing personal IBM Cloud account for the same email/IBMid, sometimes you will be
+directed to your personal account. In this case, please switch your account to the xxxxxxx - watsonx
+account. Select your account drop-down at top-right of the dashboard and select watsonx account.
+Refer to the below image on switching accounts in your cloud dashboard.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 7
+
+===== PAGE 8 =====
+
+Hackathon Guide
+Accessing and utilizing IBM watsonx products
+To begin building your agentic AI solution, explore the capabilities and resources for each IBM watsonx product
+enabled for this hackathon. Note, watsonx Orchestrate is a required product in this hackathon and any other
+product (watsonx.ai) are optional.
+1. IBM watsonx Orchestrate
+The core platform for designing, deploying, and managing AI agents that automate workflows and tasks
+using a no-code/low-code interface.
+2. IBM watsonx.ai (Optional)
+A powerful AI studio that enables you to experiment with foundation models like IBM Granite through
+the Prompt Lab. It can be used to enhance your agents with natural language understanding, intelligent
+decision-making, and dynamic response generation—serving as an inference engine to make your AI
+agents smarter and more interactive.
+1. IBM watsonx Orchestrate
+After successfully joining the IBM Cloud account, you can now access the watsonx Orchestrate to work on the
+platform and build your solution.
+IBM watsonx Orchestrate is an intuitive, AI-powered platform that you can use to create, configure, and deploy
+intelligent agents that can automate business tasks. Whether you're automating repetitive workflows or building
+complex multi-agent systems, the platform is designed to support users of all skill levels.
+With watsonx Orchestrate, you can:
+• Build and deploy agents without writing code
+• Automate tasks such as scheduling, data entry, and approvals
+• Start small and scale up with advanced tools and integrations
+• Explore the clean, guided UI that simplifies agent creation and management.
+Get a quick overview of how to use watsonx Orchestrate.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 8
+
+===== PAGE 9 =====
+
+Hackathon Guide
+Accessing watsonx Orchestrate
+In your IBM Cloud account dashboard, select the Navigation menu on the top left of the dashboard and select
+the Resource list option.
+Expand the AI / Machine Learning section and select watsonx-Hackathon Orchestrate service.
+You will be navigated to watsonx-Hackathon Orchestrate service instance dashboard. Select the Launch
+watsonx Orchestrate button.
+You will be navigated to the watsonx Orchestrate platform with a welcome message and a new chat window.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 9
+
+===== PAGE 10 =====
+
+Hackathon Guide
+Discover the catalog
+The IBM watsonx Orchestrate catalog is your gateway to a rich collection of prebuilt AI agents and tools,
+designed to support a wide range of business functions and use cases. Whether you're looking to automate
+tasks, enhance productivity, or integrate with backend systems, the catalog helps you find the right solutions
+quickly and efficiently. Learn more about discovering the catalog.
+Building agents
+In IBM watsonx Orchestrate, agents are a key component of the agentic AI framework, enabling you to create
+complex, dynamic systems that can adapt and respond to changing conditions.
+By building agents, you can:
+• Automate repetitive tasks
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 10
+
+===== PAGE 11 =====
+
+Hackathon Guide
+• Improve decision-making processes
+• Enhance customer and employee experiences
+• Increase operational efficiency
+1. Prepare to build AI agents
+Developing intelligent, scalable, and reliable agents in watsonx Orchestrate requires a strategic, multi-phase
+approach. It goes beyond writing prompts or connecting APIs. Successful agents need thoughtful planning,
+structured development, testing, and ongoing governance. The following overview breaks down each phase
+of agent development, highlighting key considerations. Learn more about preparing to build AI agents.
+2. Creating and customizing agents
+Creating and customizing an AI agent involves defining its purpose and personality through thoughtful
+descriptions, selecting the most suitable foundation model, and choosing a style that aligns with your brand
+or use case. You can also configure key elements like the welcome message and starter prompts to ensure
+the agent engages users effectively from the first interaction. Together, the configured components shape
+how the agent communicates, responds, and delivers value across conversations.
+Learn how to create an agent from scratch or from a template.
+Expanding your agent’s capabilities:
+To enhance your agent's abilities, explore the following configuration options:
+• Define a profile
+Provide a clear and specific description of the agent’s purpose. This helps in multi-agent
+orchestration by enabling accurate selection based on capabilities. See Defining the description of
+your agent.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 11
+
+===== PAGE 12 =====
+
+Hackathon Guide
+• Define a style
+Choose how the agent interprets and responds to user requests, selects actions, and engages with
+tools. See Choosing a style for your agent.
+• Choosing a foundational model
+Select a foundation model from the Agent Builder UI to define your AI agent’s core capabilities.
+See Choosing an LLM model.
+• Customize the welcome message and starter prompts
+Customize the welcome message and starter prompts to guide users when they begin interacting
+with the agent. See Customizing the welcome message and starter prompts.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 12
+
+===== PAGE 13 =====
+
+Hackathon Guide
+• Customize the text below the welcome message
+You can now modify the default light gray text below the welcome message only through ADK. For
+more information, see Customize the light gray text.
+• Add knowledge
+Enhance the agent’s domain expertise by adding contextual knowledge from files or content
+repositories. See Adding knowledge to agents.
+• Add tools
+Integrate tools to enable the agent to perform automated tasks such as retrieving data or sending
+emails. See Adding and managing tools for agents.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 13
+
+===== PAGE 14 =====
+
+Hackathon Guide
+• Add collaborator agents
+Enable multi-agent orchestration by adding collaborator agents that work together to achieve
+shared goals. See Adding agents for orchestration.
+• Add instructions
+Define behavioral rules and interaction logic to guide the agent’s responses and actions. See Adding
+instructions to agents.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 14
+
+===== PAGE 15 =====
+
+Hackathon Guide
+• Connect to channels
+Make the agent accessible to your team by connecting it to various interaction channels.
+See Connecting to channels.
+• Configure rich responses
+Enable rich responses to incorporate multimedia and structured elements, making AI interactions
+clearer, more efficient, and engaging for users. See Configuring rich responses from the AI assistant
+builder.
+• Deploy the agent
+Finalize the setup by deploying the agent to make it available in live environments such as chat
+interfaces. See Deploying the agent.
+• Embedding your agents
+You can embed your agents into various applications such as websites, Slack workspaces, or other
+messaging apps, allowing users to interact with them across different environments. See Using an
+agent in embedded chat.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 15
+
+===== PAGE 16 =====
+
+Hackathon Guide
+• Building agents using the ADK
+You can build powerful, customizable agents using the IBM watsonx Orchestrate Agent
+Development Kit (ADK). Learn more about using the ADK.
+Building AI assistants
+In IBM watsonx Orchestrate, you build the AI assistant by using AI assistant builder. AI assistant builder is a
+chat interface builder that helps to deploy an engaging and embedded chatbot experience. AI assistant builder
+integrates the power of large language models (LLMs) and conversational capabilities of watsonx Assistant to
+enable responsive and interactive conversation between the users and watsonx Orchestrate.
+To learn more, see Building AI assistants in AI assistant builder.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 16
+
+===== PAGE 17 =====
+
+Hackathon Guide
+Using agents in the chat
+In IBM watsonx Orchestrate, agents collaborate to automate tasks and manage workflows. Learn more using
+agents in Orchestrate Chat.
+Managing app connections
+To use the external applications within IBM watsonx Orchestrate, you must establish a connection between
+them which acts as bridge enabling communication between watsonx Orchestrate and the external applications.
+Learn more about managing app connections and credentials.
+Admin capabilities
+IBM watsonx Orchestrate provides a robust set of administrative capabilities to help organizations manage their
+environments securely, efficiently, and at scale. As an administrator, you can control user access, configure
+integrations, and ensure compliance with enterprise policies.
+• Managing users
+Add, remove, and manage users. Assign roles such as Admin, Builder, or User to control access and
+permissions.
+• Managing settings
+Customize system configurations.
+• Securing your instance
+Learn how to secure your watsonx Orchestrate instance.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 17
+
+===== PAGE 18 =====
+
+Hackathon Guide
+watsonx Orchestrate API
+Use resources from watsonx Orchestrate with the API. Access resources from the chat such as AI assistants, AI
+agents, and message threads, or resources from the skill sets such as imported skills, decisions, workflows, and
+generative AI skills.
+• Getting started with the API
+Begin using the API with practical, step-by-step guidance.
+• API reference
+Get the methods that you can use to call custom skills, projects, or other resources from the AI chat.
+Quick start hands-on exercises
+Try the quick start hands-on exercises for sample use cases to get started with using watsonx Orchestrate:
+Important note: You must use the hackathon provisioned cloud account to access and use watsonx Orchestrate
+platform to complete the exercises and to avoid any cloud account usage issues.
+watsonx Orchestrate SaaS sample exercises:
+• Develop agents with no code using watsonx Orchestrate
+• Creating intelligent, reusable agentic workflows on watsonx Orchestrate with no code
+• Build context-aware AI agents with watsonx Orchestrate and Astra DB
+• AgentOps in watsonx Orchestrate: Observability for Agents with Langfuse and IBM Telemetry
+watsonx Orchestrate Agent Development Kit (ADK) sample exercises:
+• Getting Started with watsonx Orchestrate Agent Development Kit
+• Build an AI agent with Langflow, Granite 4.0 models, and watsonx Orchestrate
+• A hands-on guide for creating MCP tools and consuming them with watsonx Orchestrate Agent
+Development Kit
+• A hands-on guide to bring your own model (BYOM) into watsonx Orchestrate using AI Gateway
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 18
+
+===== PAGE 19 =====
+
+Hackathon Guide
+2. IBM watsonx.ai (OPTIONAL)
+After successfully joining the IBM Cloud account, you can now access IBM watsonx.ai to work on the platform
+and build your solution.
+Note on IBM watsonx.ai service usage
+For this hackathon, $100 credits will be automatically applied on the provisioned IBM watsonx.ai platform.
+This should be sufficient for designing and creating compelling submissions.
+You will receive periodic email notifications about your credit consumption at the following usage levels: 25%,
+50%, and 80%. Once you reach 100% usage, your account will be suspended. You can appeal the suspension
+by completing the form shared in the account suspension notification email.
+Please note that these email notifications are sent once per hour, so there is a possibility that you may exhaust
+all your credits before receiving an alert.
+Please plan to use the watsonx.ai efficiently and back up your work accordingly. Refer tips to work efficiently
+on watsonx.ai platform (Tokens and CUH explained) and saving your work.
+Important:
+• Foundation model inferencing consumes tokens, which are measured as Resource Units (RUs).
+1,000 tokens = 1 RU, and each RU costs $0.0001 USD.
+Learn more about tokens and tokenization.
+• If you are using Jupyter Notebook editor on watsonx.ai, consider selecting a lower runtime
+environment to avoid high resource consumption and quickly depleting your credits. Notebook runtimes
+are billed based on Capacity Unit Hours (CUH) at a rate of $1.02 USD per CUH.
+Learn more about capacity unit hours and watsonx.ai Studio pricing plans.
+Note on available watsonx.ai services
+The watsonx.ai platform is pre-configured with only the services required to complete the hackathon. If you
+notice a permission/access issue for any service or the cloud catalog, then they are not required/available for
+this hackathon.
+These features/capabilities are out of scope for this hackathon:
+• Agent Lab (Beta)
+• Deploy on IBM Cloud
+• Bring your own model
+• Fine tuning models
+• AutoAI pipeline
+• AI governance
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 19
+
+===== PAGE 20 =====
+
+Hackathon Guide
+• Evaluation Studio
+• SPSS Modeler
+DO NOT USE the below listed models as they are out of scope for the hackathon and can negatively impact
+the judgment of your project submission.
+• llama-3-405b-instruct
+• mistral-medium-2505
+• mistral-small-3-1-24b-instruct-2503
+The hackathon provisioned IBM Cloud account will be deactivated after the completion of the hackathon.
+Please plan to save your work at the end of the hackathon.
+Access Prompt Lab on watsonx.ai
+After successfully joining the IBM Cloud account, you can now access the Prompt Lab on watsonx.ai platform to
+work with the AI models supported on the platform and build your solution.
+1. Log in to the watsonx.ai platform with the email you used to access your IBM Cloud account.
+2. After successful authentication, you will see “Welcome to watsonx” widget. You have to read and accept
+the terms, data use policy and cookie use to proceed. You can either take the tour or skip it.
+3. Next, you will see the watsonx.ai dashboard. Ensure the name of the account is “xxxxxxx – watsonx”
+and the region is “Dallas”.
+4. Select the Open Prompt Lab button on the “Chat and build prompts with foundational models” widget.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 20
+
+===== PAGE 21 =====
+
+Hackathon Guide
+5. The “Welcome to Prompt Lab” tour will be displayed. You can take the tour to get a quick introduction or
+skip it.
+6. The Prompt Lab Editor opens with a chat window to get you started with the prompt session.
+Work with the watsonx.ai Prompt Lab
+The watsonx.ai Prompt Lab is an easy-to-use prompt engineering interface where you can experiment
+prompting different AI foundation models, explore sample prompts, tune model parameters, integrate
+applications with an API endpoint, and save and share your best prompts.
+Take a tour of the Prompt Lab and try the interactive demo.
+You can access and use the AI models to build your innovative solution using Prompt Lab.
+Prompt Lab editor
+In the Prompt Lab, you can experiment with prompting different foundation models, explore sample prompts, as
+well as save and share your best prompts. The Prompt Lab editor is a great place to experiment and iterate with
+your prompts. Try the quick start lab.
+However, you can also prompt foundation models in watsonx.ai programmatically. Refer to “Programmatic
+access (API/SDK)” section.
+Selecting an AI model
+A default AI model will be pre-selected in the Prompt Lab editor. You can either use the same model or change
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 21
+
+===== PAGE 22 =====
+
+Hackathon Guide
+to a different model. To select a different model:
+1. Select the AI Model drop-down menu at the top-right of the editor and select View all foundation
+models.
+2. The Select a foundation model widget will appear. Clear the filters to see all the available models. You
+can use the filters to choose the right model for your solution building. You can select a model tile to
+learn about the model and use it. If you are limited to only “Chat” supported models, change the Prompt
+Lab editor to Structured or Freeform view and try selecting the models to see all the available model
+options.
+Important: DO NOT USE the below listed models as they are out of scope for the hackathon and
+can negatively impact the judgment of your project submission.
+• llama-3-405b-instruct
+• mistral-medium-2502
+• mistral-small-3-1-24b-instruct-2503
+To understand how models can address your use case, including information on model modalities,
+supported languages, tuning, and indemnification, see our product documentation on choosing a model.
+Note: Bigger models are not always better. Learn why smaller models can be better and more cost
+effective.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 22
+
+===== PAGE 23 =====
+
+Hackathon Guide
+Programmatic access (API/SDK)
+You can inference the watsonx.ai models with API or SDK requests.
+Developer access information
+To use the supported watsonx.ai APIs/SDKs, you will need three values: a project ID, an endpoint URL and an
+API key.
+• Go to watsonx.ai home page.
+• Scroll down to the “Developer access” section.
+• Select the Project or deployment space drop-down and select the watsonx Challenge Sandbox
+option. A project ID will be displayed.
+Note: A space ID is not required as it is out of scope for the hackathon.
+• A default watsonx.ai endpoint URL will be displayed for the Dallas region. Ensure the region is always
+set to Dallas at the top right of the watsonx.ai home page.
+• Select the Create API key button. A Create API key widget will be displayed. Enter a name, provide
+optional description and choose the “Disable the leaked key” option. Click the Create button.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 23
+
+===== PAGE 24 =====
+
+Hackathon Guide
+• An API key will be created successfully. Copy the API key and save it safely to use for calling the
+API/SDK. You can also download and save the file in a secure path in your system.
+watsonx.ai programmatic options
+There are multiple options to help you get started using watsonx.ai APIs/SDKs.
+Option 1: Prompt Code on Prompt Lab
+Refer to the access prompt code instructions to learn how to quickly get access to the text generation API
+within the watsonx.ai Prompt Lab.
+Option 2: Different watsonx.ai API capabilities
+Explore and leverage different watsonx.ai API capabilities in your solution.
+• Chat
+• Agent-driven chat
+• Tool calling
+• Text generation
+• Time series
+• Text rerank
+• Embeddings
+• Text extraction
+Refer to supported API functionality by model here.
+Access the prompt code (API) from Prompt Lab editor
+To prompt an AI model programmatically, you can view and copy the prompt code by selecting the View code
+icon </> at the top-right of the prompt lab editor.
+The prompt code is available as a Curl, Node.js and Python.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 24
+
+===== PAGE 25 =====
+
+Hackathon Guide
+You will require an IAM access token to authorize the prompt code and need to replace
+${YOUR_ACCESS_TOKEN} placeholder in the prompt code. You can create an IAM access token using an API
+key.
+• API key:
+Refer to Developer access information to get an API key.
+• Generate IAM Access Token:
+Programmatically generate an IAM access token with the API key using the following cURL command:
+curl -X POST 'https://iam.cloud.ibm.com/identity/token' -H 'Content-Type: application/x-www-form-
+urlencoded' -d 'grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=MY_APIKEY'
+• curl -X POST → Specifies an HTTP POST request.
+• URL ("https://iam.cloud.ibm.com/identity/token") → The endpoint to request an
+authentication token from IBM Cloud.
+• -H "Content-Type: application/x-www-form-urlencoded" → Sets the request header to
+indicate that the data is sent in form-encoded format.
+• -d (Data Payload) → Sends the required data:
+• grant_type=urn:ibm:params:oauth:grant-type:apikey → Specifies the OAuth grant type as
+API Key.
+• apikey=MY_IBM_CLOUD_API_KEY → Replace MY_IBM_CLOUD_API_KEY with your actual IBM
+Cloud API key.
+Expected Response:
+{
+"access_token": "eyJhbGciOiJIUz......sgrKIi8hdFs",
+"refresh_token": "not_supported",
+"token_type": "Bearer",
+"expires_in": 3600,
+"expiration": 1473188353,
+"scope": “ibm openid”
+}
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 25
+
+===== PAGE 26 =====
+
+Hackathon Guide
+Note: An IAM token is valid for up to 60 minutes, and it is subject to change. When a token expires, you
+must generate a new one. Use the property “expires_in” for the expiration of the IAM token that you
+have just created.
+watsonx.ai AI agent libraries and tutorials
+Explore the watsonx.ai supported AI agent framework libraries and tutorials to help you get started building your
+AI agent solution.
+• LangChain
+• LangGraph
+• LlamaIndex
+• CrewAI
+• BeeAI
+• AutoGen
+• Python SDK
+• Node.js SDK
+Quick start hands-on exercises
+Try the quick start exercises and notebooks for sample use cases to get started with using watsonx.ai.
+Important notes:
+• Refer to developer access information section to use watsonx.ai credentials as you try the exercises.
+• Some of the exercises could include the usage of old model version. You can replace them with newer
+versions for better performance and output. To check the latest supported AI models on watsonx.ai,
+either follow selecting an AI model on Prompt Lab or refer to supported foundation models on
+watsonx.ai.
+• The hackathon provisioned cloud accounts do not support solution deployment. You can run your
+solution deployment locally on your machine and showcase them in your submissions.
+• Foundation model inferencing consumes tokens, which are measured as Resource Units (RUs).
+1,000 tokens = 1 RU, and each RU costs $0.0001 USD.
+Learn more about tokens and tokenization.
+• If you are using Jupyter Notebook editor on watsonx.ai, consider selecting a lower runtime
+environment to avoid high resource consumption and quickly depleting your credits. Notebook runtimes
+are billed based on Capacity Unit Hours (CUH) at a rate of $1.02 USD per CUH.
+Learn more about capacity unit hours and watsonx.ai Studio pricing plans.
+watsonx.ai Prompt Lab app templates:
+• LangGraph LLM app template with function calling capabilities (base template)
+• LlamaIndex Workflow LLM app template with function calling capabilities (base template)
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 26
+
+===== PAGE 27 =====
+
+Hackathon Guide
+• CrewAI LLM app template with function calling capabilities (base template)
+• arXiv Research agent (community template)
+• Agentic RAG LangGraph template (community template)
+BeeAI Agent Framework:
+• BeeAI framework examples
+LangChain and LangGraph:
+• Create a LangChain AI Agent in Python using watsonx
+• Build a RAG agent using LangGraph to answer complex questions
+• Build a LangChain agentic RAG system using the Granite model in watsonx.ai
+• Use watsonx, and LangChain Agents to perform sequence of actions
+• Use watsonx, and LangChain to make a series of calls to a language model
+• arXiv Research agent
+• Base LangGraph LLM app template with function calling capabilities
+LlamaIndex:
+• Use watsonx and LlamaIndex for Text-to-SQL task
+• Use watsonx, and `llama-3-1-70b-instruct` and LlamaIndex to make simple chat conversation and tool
+calls
+• LlamaIndex Workflow LLM app template with function calling capabilities
+CrewAI:
+• Leveraging CrewAI and IBM watsonx
+• Build an agentic framework with CrewAI memory, i18n, and IBM watsonx.ai
+• Base CrewAI LLM app template with function calling capabilities
+Save your Prompt Lab session
+You can save your Prompt Lab editor session for later use.
+1. At the top of the Prompt Lab screen, select the Save work dropdown button and then select the Save as
+option.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 27
+
+===== PAGE 28 =====
+
+Hackathon Guide
+2. A Save your work widget will appear. Select Prompt session under the Asset type option.
+3. Enter a name and check the View in project after saving option under the Define details section.
+4. Finally, click the Save button. Once you save, you will see the saved work under the Assets tab
+You can also save your work as:
+• Prompt template to save only the current prompt without its history and selecting a Task
+suitable for your prompting.
+• Notebook to continue prompting on a Jupyter Notebook environment. Prior knowledge of
+notebooks and Python programming language would be helpful to work with a Jupyter
+notebook. Read more about notebooks.
+Save your work on watsonx.ai
+Make sure to save any work you want to retain for your records. IBM Cloud accounts will be deactivated at the
+end of the hackathon. Follow the steps below to save your work:
+1. Go to your project’s ‘Overview’ tab.
+2. Select the ‘Export or import project’ drop down below the Bell icon in the top menu bar.
+3. Click the ‘Export project’ option. This will open ‘Export project to desktop’ screen.
+4. Select all the assets shown in your project (Work saved as Project session cannot be exported) and click
+‘Export’ on the bottom-right of the screen.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 28
+
+===== PAGE 29 =====
+
+Hackathon Guide
+5. The next screen will ask for confirmation that all sensitive information has been removed.
+6. Click on ‘Continue export’.
+7. The download (zip) will be initiated, and the file will be saved on your computer.
+Agentic AI Hackathon with IBM watsonx Orchestrate / © 2025 IBM Corporation 29

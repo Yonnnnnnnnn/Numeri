@@ -101,32 +101,63 @@ async function generateIAMToken(apiKey) {
 function constructPayload(currentData, imageBase64, prompt, isVisionTask) {
   const dataContext = JSON.stringify(currentData, null, 2);
 
-  let input = '';
-
   if (isVisionTask && imageBase64) {
     // Vision task: Include base64 image
-    input = `${imageBase64}\n\nCurrent JSON Dataset:\n\n${dataContext}\n\nUser Command: ${prompt || 'Process this receipt and add it to the dataset.'}`;
+    const visionPrompt = `You are a receipt/invoice data extraction expert. Extract information from the image and add it to the dataset.
+
+Current JSON Dataset:
+${dataContext}
+
+User Command: ${prompt || 'Process this receipt and add it to the dataset.'}
+
+IMPORTANT: Return ONLY valid JSON with this exact structure:
+{
+  "filename": "transactions_updated.json",
+  "content": [array of ALL rows including the new one],
+  "explanation": "Description in Bahasa Indonesia"
+}
+
+Image: ${imageBase64}`;
+
     return {
-      model_id: 'meta-llama/llama-3.2-90b-instruct-vision-001',
-      input,
+      model_id: 'meta-llama/llama-3-2-90b-instruct-vision-001',
+      input: visionPrompt,
       parameters: {
         decoding_method: 'sampling',
-        max_new_tokens: 8192,
-        min_new_tokens: 10,
-        temperature: 0.5,
+        max_new_tokens: 4096,
+        min_new_tokens: 50,
+        temperature: 0.3,
       },
     };
   } else {
-    // Text-only task
-    input = `Current JSON Dataset:\n\n${dataContext}\n\nUser Command: ${prompt}`;
+    // Text-only task with improved prompt
+    const systemPrompt = `You are a spreadsheet data processing AI. You modify JSON data based on user commands.
+
+RULES:
+1. ALWAYS return the COMPLETE array (not just changes)
+2. Preserve the column structure (col_0, col_1, col_2, etc.)
+3. Return ONLY valid JSON, no markdown, no explanations outside JSON
+4. Use Bahasa Indonesia for the explanation field
+
+Current JSON Dataset:
+${dataContext}
+
+User Command: ${prompt}
+
+Return ONLY this JSON structure:
+{
+  "filename": "transactions_updated.json",
+  "content": [complete array with all rows],
+  "explanation": "Penjelasan perubahan dalam Bahasa Indonesia"
+}`;
+
     return {
-      model_id: 'ibm/granite-3.0-8b-instruct',
-      input,
+      model_id: 'ibm/granite-3-8b-instruct',
+      input: systemPrompt,
       parameters: {
         decoding_method: 'greedy',
-        max_new_tokens: 8192,
-        min_new_tokens: 10,
-        stop_sequences: [']', '}'],
+        max_new_tokens: 4096,
+        min_new_tokens: 50,
         temperature: 0.1,
       },
     };
@@ -144,7 +175,8 @@ async function callWatsonxAPI(
   host,
   projectId
 ) {
-  const url = `https://${region}.${host}/v2/text/generate`;
+  // Correct endpoint: /ml/v1/text/generation with version parameter
+  const url = `https://${region}.${host}/ml/v1/text/generation?version=2023-05-29`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
@@ -155,14 +187,17 @@ async function callWatsonxAPI(
       headers: {
         Authorization: `Bearer ${iamToken}`,
         'Content-Type': 'application/json',
-        'IBM-Project-Id': projectId,
+        Accept: 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        project_id: projectId, // Add project_id to payload
+      }),
       signal: controller.signal,
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
       throw new Error(
         `watsonx API error: ${response.status} ${JSON.stringify(errorData)}`
       );
