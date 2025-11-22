@@ -88,7 +88,7 @@ async function handleVisionTask(currentData, imageBase64, prompt) {
  */
 async function handleLogicTask(currentData, userPrompt) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-001' });
 
   const dataContext = JSON.stringify(currentData, null, 2);
 
