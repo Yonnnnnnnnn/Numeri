@@ -1,379 +1,547 @@
-import React, { useState, useRef } from 'react';
-import { Upload, Download, Send, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Folder, FileJson, Save, Send, Image as ImageIcon, Settings, Menu, RotateCcw, Trash2, Plus, X, Server } from 'lucide-react';
 
-// Mock API function simulating IBM watsonx Orchestrate
-const mockProcessAI = async (currentData, imageBase64, prompt) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      let updatedContent = [...currentData];
+// --- MOCK DATA & UTILS ---
 
-      if (imageBase64) {
-        // Vision task: Add new transaction from receipt image
-        const newTransaction = {
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          date: new Date().toISOString().split('T')[0],
-          description: 'Receipt from Image',
-          amount: Math.floor(Math.random() * 500000) + 10000,
-          category: 'Expense',
-          type: 'expense',
-        };
-        updatedContent.push(newTransaction);
-      } else if (prompt && updatedContent.length > 0) {
-        // Text task: Modify last item or parse command
-        const lastIndex = updatedContent.length - 1;
+const MOCK_INITIAL_FILES = [];
 
-        // Check if prompt contains "add" command
-        const addMatch = prompt.match(/add\s+(\d+)/i);
-        if (addMatch) {
-          const amount = parseInt(addMatch[1], 10);
-          updatedContent[lastIndex].amount = amount;
-        } else if (prompt.toLowerCase().includes('change') || prompt.toLowerCase().includes('update')) {
-          // Generic update to description
-          updatedContent[lastIndex].description = prompt.replace(/change|update|to|jadi/gi, '').trim() || 'Updated Item';
+// --- COMPONENTS ---
+
+const FileSidebar = ({ files, activeFile, onSelectFile, onCreateFile }) => (
+  <div className="w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 h-full shadow-2xl">
+    <div className="p-4 border-b border-slate-800 flex items-center gap-2 font-extrabold text-lg text-white">
+      <div className="w-6 h-6 bg-cyan-500 rounded-sm flex items-center justify-center">
+        <Server size={14} className="text-slate-900" />
+      </div>
+      <span className="text-white tracking-wider">Numeri</span>
+      <span className="text-xs bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400 font-mono">.json</span>
+    </div>
+
+    <div className="p-3">
+      <button
+        onClick={onCreateFile}
+        className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 px-3 py-2 rounded-lg text-sm transition-colors text-cyan-400 font-semibold border border-cyan-500/30 shadow-md shadow-cyan-900/50"
+      >
+        <Plus size={16} /> New Data File
+      </button>
+    </div>
+
+    <div className="flex-1 overflow-y-auto px-2 pb-4">
+      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 mt-2 pl-2">
+        Project Files
+      </div>
+      {files.length === 0 ? (
+        <div className="text-center py-8 px-4">
+          <FileJson size={32} className="mx-auto mb-3 text-slate-600 opacity-50" />
+          <p className="text-xs text-slate-500 leading-relaxed">
+            No files yet. Click "New Data File" to get started.
+          </p>
+        </div>
+      ) : (
+        files.map((file) => (
+          <button
+            key={file.name}
+            onClick={() => onSelectFile(file.name)}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-1 transition-colors text-left ${activeFile === file.name
+                ? 'bg-cyan-600/30 text-cyan-400 font-semibold border border-cyan-600'
+                : 'hover:bg-slate-800 text-slate-400'
+              }`}
+          >
+            <FileJson size={16} className={activeFile === file.name ? 'text-cyan-400' : 'text-slate-500'} />
+            <span className="truncate">{file.name}</span>
+          </button>
+        ))
+      )}
+    </div>
+  </div>
+);
+
+const JsonGridEditor = ({ content, onUpdateContent }) => {
+  const [parsedData, setParsedData] = useState([]);
+  const [columnNames, setColumnNames] = useState([]);
+  const [editingColumn, setEditingColumn] = useState(null);
+  const [error, setError] = useState(null);
+
+  // Convert column index to letter (0 -> A, 1 -> B, etc.)
+  const getColumnLetter = (index) => {
+    let letter = '';
+    let num = index;
+    while (num >= 0) {
+      letter = String.fromCharCode(65 + (num % 26)) + letter;
+      num = Math.floor(num / 26) - 1;
+    }
+    return letter;
+  };
+
+  useEffect(() => {
+    try {
+      const data = JSON.parse(content);
+      if (Array.isArray(data)) {
+        if (data.length > 0) {
+          // Get union of all keys to handle irregular JSON arrays
+          const allKeys = new Set();
+          data.forEach(item => Object.keys(item).forEach(key => allKeys.add(key)));
+          const keys = Array.from(allKeys);
+
+          // Create default column names (Column 1, Column 2, etc.)
+          const defaultNames = keys.map((_, idx) => `Column ${idx + 1}`);
+          setColumnNames(defaultNames);
+          setParsedData(data);
+          setError(null);
+        } else {
+          // Empty array - start with 3 default columns
+          setColumnNames(['Column 1', 'Column 2', 'Column 3']);
+          setParsedData([]);
+          setError(null);
         }
+      } else {
+        throw new Error("Data must be an array");
       }
+    } catch (e) {
+      setError("Invalid JSON structure");
+      setParsedData([]);
+      setColumnNames([]);
+    }
+  }, [content]);
 
-      const response = {
-        filename: 'transactions_updated.json',
-        content: updatedContent,
-        explanation: imageBase64
-          ? `Added 1 receipt from image. Total items: ${updatedContent.length}`
-          : prompt
-          ? `Modified dataset based on command: "${prompt}". Total items: ${updatedContent.length}`
-          : `Processed dataset. Total items: ${updatedContent.length}`,
-      };
+  const handleAddColumn = () => {
+    const newColumnName = `Column ${columnNames.length + 1}`;
+    setColumnNames([...columnNames, newColumnName]);
 
-      resolve(response);
-    }, 1500);
-  });
+    // Add empty value to all existing rows
+    const updatedData = parsedData.map(row => ({
+      ...row,
+      [`col_${columnNames.length}`]: ''
+    }));
+    setParsedData(updatedData);
+
+    // Notify parent if callback exists
+    if (onUpdateContent) {
+      onUpdateContent(JSON.stringify(updatedData, null, 2));
+    }
+  };
+
+  const handleAddRow = () => {
+    const newRow = {};
+    columnNames.forEach((_, idx) => {
+      newRow[`col_${idx}`] = '';
+    });
+
+    const updatedData = [...parsedData, newRow];
+    setParsedData(updatedData);
+
+    // Notify parent if callback exists
+    if (onUpdateContent) {
+      onUpdateContent(JSON.stringify(updatedData, null, 2));
+    }
+  };
+
+  const handleRenameColumn = (index, newName) => {
+    const updatedNames = [...columnNames];
+    updatedNames[index] = newName || `Column ${index + 1}`;
+    setColumnNames(updatedNames);
+    setEditingColumn(null);
+  };
+
+  const handleCellEdit = (rowIndex, colIndex, value) => {
+    const updatedData = [...parsedData];
+    const colKey = `col_${colIndex}`;
+    updatedData[rowIndex] = {
+      ...updatedData[rowIndex],
+      [colKey]: value
+    };
+    setParsedData(updatedData);
+
+    // Notify parent if callback exists
+    if (onUpdateContent) {
+      onUpdateContent(JSON.stringify(updatedData, null, 2));
+    }
+  };
+
+  if (error) return (
+    <div className="flex-1 flex items-center justify-center text-slate-500 bg-slate-950/50 m-4 rounded-xl border border-slate-700 border-dashed">
+      <div className="text-center p-8">
+        <FileJson size={48} className="mx-auto mb-4 opacity-50 text-red-500" />
+        <p className="text-lg font-mono text-red-400">{error}</p>
+        <p className="text-sm mt-2 text-slate-500">Please correct the JSON format.</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex-1 flex flex-col bg-slate-900 shadow-inner overflow-hidden">
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2 p-3 bg-slate-800/50 border-b border-slate-700">
+        <button
+          onClick={handleAddColumn}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 text-xs font-medium rounded-lg border border-cyan-500/30 transition-colors"
+        >
+          <Plus size={14} /> Add Column
+        </button>
+        <button
+          onClick={handleAddRow}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-xs font-medium rounded-lg border border-green-500/30 transition-colors"
+        >
+          <Plus size={14} /> Add Row
+        </button>
+      </div>
+
+      {/* Spreadsheet Table */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-sm text-left border-collapse">
+          <thead className="text-xs bg-slate-800 sticky top-0 shadow-lg z-10">
+            <tr>
+              <th className="px-4 py-3 w-16 text-center text-slate-500 font-mono border-b border-r border-slate-700 bg-slate-800">#</th>
+              {columnNames.map((name, idx) => (
+                <th
+                  key={idx}
+                  className="px-4 py-3 font-medium border-b border-r border-slate-700 text-slate-300 min-w-[150px] group"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-500 font-mono">{getColumnLetter(idx)}</span>
+                    {editingColumn === idx ? (
+                      <input
+                        type="text"
+                        defaultValue={name}
+                        autoFocus
+                        onBlur={(e) => handleRenameColumn(idx, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRenameColumn(idx, e.target.value);
+                          if (e.key === 'Escape') setEditingColumn(null);
+                        }}
+                        className="flex-1 bg-slate-700 text-cyan-400 px-2 py-1 rounded text-xs outline-none border border-cyan-500"
+                      />
+                    ) : (
+                      <span
+                        onClick={() => setEditingColumn(idx)}
+                        className="flex-1 text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors"
+                      >
+                        {name}
+                      </span>
+                    )}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="text-slate-200">
+            {parsedData.length === 0 ? (
+              <tr>
+                <td colSpan={columnNames.length + 1} className="text-center py-12 text-slate-500">
+                  <p className="text-sm">No data yet. Click "+ Add Row" to start.</p>
+                </td>
+              </tr>
+            ) : (
+              parsedData.map((row, rowIdx) => (
+                <tr
+                  key={rowIdx}
+                  className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors group"
+                >
+                  <td className="px-4 py-2 text-center text-slate-500 font-mono text-xs border-r border-slate-800 bg-slate-900/50">
+                    {rowIdx + 1}
+                  </td>
+                  {columnNames.map((_, colIdx) => {
+                    const colKey = `col_${colIdx}`;
+                    const value = row[colKey] || '';
+                    const isNumeric = typeof value === 'number' || (!isNaN(parseFloat(value)) && isFinite(value) && value !== '');
+
+                    return (
+                      <td
+                        key={`${rowIdx}-${colIdx}`}
+                        className="px-4 py-2 border-r border-slate-800"
+                      >
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) => handleCellEdit(rowIdx, colIdx, e.target.value)}
+                          className={`w-full bg-transparent outline-none focus:bg-slate-800/50 px-2 py-1 rounded text-xs transition-colors ${isNumeric ? 'text-green-400 font-semibold text-right' : 'text-slate-300'
+                            }`}
+                          placeholder="-"
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 };
 
-export default function NumeriApp() {
-  const [transactions, setTransactions] = useState([]);
-  const [imageBase64, setImageBase64] = useState(null);
-  const [prompt, setPrompt] = useState('');
-  const [status, setStatus] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [explanation, setExplanation] = useState('');
-  const fileInputRef = useRef(null);
-  const imageInputRef = useRef(null);
+const ChatInterface = ({ messages, onSendMessage, isProcessing }) => {
+  const [input, setInput] = useState('');
+  const messagesEndRef = useRef(null);
 
-  // Handle JSON file upload
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result;
-        const parsed = JSON.parse(content);
-
-        // Validate structure
-        if (!Array.isArray(parsed)) {
-          throw new Error('JSON must be an array of transactions');
-        }
-
-        setTransactions(parsed);
-        setError('');
-        setStatus('File loaded successfully');
-        setTimeout(() => setStatus(''), 3000);
-      } catch (err) {
-        setError(`Invalid JSON Format: ${err.message}`);
-        setTransactions([]);
-      }
-    };
-    reader.readAsText(file);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Handle image upload and convert to Base64
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(scrollToBottom, [messages]);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const base64String = event.target?.result;
-        setImageBase64(base64String);
-        setError('');
-        setStatus('Image loaded. Ready to process.');
-        setTimeout(() => setStatus(''), 3000);
-      } catch (err) {
-        setError('Failed to load image');
-      }
-    };
-    reader.readAsDataURL(file);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    onSendMessage(input);
+    setInput('');
   };
 
-  // Process with mock AI
-  const handleProcessAI = async () => {
-    if (!imageBase64 && !prompt && transactions.length === 0) {
-      setError('Please upload an image, enter a prompt, or load existing data first');
-      return;
-    }
+  const ChatBubble = ({ role, content, image }) => {
+    const isUser = role === 'user';
+    const bubbleClass = isUser
+      ? 'bg-blue-600 text-white rounded-br-none'
+      : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none';
 
-    setLoading(true);
-    setStatus('Analyzing Document...');
-    setError('');
-
-    try {
-      const result = await mockProcessAI(transactions, imageBase64, prompt);
-
-      setTransactions(result.content);
-      setExplanation(result.explanation);
-      setStatus('Processing complete!');
-      setImageBase64(null);
-      setPrompt('');
-
-      // Clear image input
-      if (imageInputRef.current) {
-        imageInputRef.current.value = '';
-      }
-
-      setTimeout(() => setStatus(''), 4000);
-    } catch (err) {
-      setError('Error processing request. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Download JSON file
-  const handleDownload = () => {
-    if (transactions.length === 0) {
-      setError('No data to download. Upload or process data first.');
-      return;
-    }
-
-    const dataStr = JSON.stringify(transactions, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'transactions_updated.json';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setStatus('Download Ready');
-    setTimeout(() => setStatus(''), 3000);
+    return (
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <div className={`max-w-[85%] p-3 rounded-xl text-sm shadow-lg ${bubbleClass}`}>
+          {content}
+          {image && (
+            <div className="mt-3 rounded-lg overflow-hidden border-2 border-slate-700">
+              <img src={image} alt="uploaded" className="max-w-full h-auto" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-            Numeri
-          </h1>
-          <p className="text-slate-400 text-lg">Data Architect • Upload → Process → Download</p>
-        </div>
-
-        {/* Status/Error Messages */}
-        <div className="mb-6 space-y-3">
-          {error && (
-            <div className="flex items-center gap-3 bg-red-900/30 border border-red-500/50 rounded-lg p-4">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-              <span className="text-red-200">{error}</span>
-            </div>
-          )}
-          {status && !error && (
-            <div className="flex items-center gap-3 bg-green-900/30 border border-green-500/50 rounded-lg p-4">
-              <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-              <span className="text-green-200">{status}</span>
-            </div>
-          )}
-          {loading && (
-            <div className="flex items-center gap-3 bg-blue-900/30 border border-blue-500/50 rounded-lg p-4">
-              <Loader className="w-5 h-5 text-blue-400 animate-spin flex-shrink-0" />
-              <span className="text-blue-200">Analyzing Document...</span>
-            </div>
-          )}
-          {explanation && (
-            <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
-              <p className="text-slate-300 text-sm"><strong>AI Response:</strong> {explanation}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Control Panel */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 mb-8 backdrop-blur-sm">
-          <h2 className="text-xl font-semibold mb-6 text-blue-300">Control Panel</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Upload JSON */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Upload JSON File</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-              >
-                <Upload className="w-5 h-5" />
-                Upload JSON
-              </button>
-            </div>
-
-            {/* Upload Image */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Upload Receipt Image</label>
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-              <button
-                onClick={() => imageInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-              >
-                <Upload className="w-5 h-5" />
-                Upload Image
-              </button>
-            </div>
-          </div>
-
-          {/* Chat Input */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-300 mb-2">Chat Prompt (Optional)</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g., 'add 100' or 'change last description to Lunch'"
-              className="w-full bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
-              rows="3"
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              onClick={handleProcessAI}
-              disabled={loading}
-              className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
-            >
-              {loading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  Process with AI
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={handleDownload}
-              disabled={transactions.length === 0}
-              className="flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
-            >
-              <Download className="w-5 h-5" />
-              Download JSON
-            </button>
-          </div>
-        </div>
-
-        {/* Data Grid */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm overflow-x-auto">
-          <h2 className="text-xl font-semibold mb-4 text-blue-300">Transaction Data Grid</h2>
-
-          {transactions.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-slate-400 text-lg">No transactions loaded. Upload a JSON file or process an image to get started.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-600">
-                    <th className="text-left py-3 px-4 font-semibold text-blue-300">ID</th>
-                    <th className="text-left py-3 px-4 font-semibold text-blue-300">Date</th>
-                    <th className="text-left py-3 px-4 font-semibold text-blue-300">Description</th>
-                    <th className="text-right py-3 px-4 font-semibold text-blue-300">Amount</th>
-                    <th className="text-left py-3 px-4 font-semibold text-blue-300">Category</th>
-                    <th className="text-left py-3 px-4 font-semibold text-blue-300">Type</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx, idx) => (
-                    <tr key={idx} className="border-b border-slate-700 hover:bg-slate-700/30 transition-colors">
-                      <td className="py-3 px-4 text-slate-300 font-mono text-xs">{tx.id?.substring(0, 12)}...</td>
-                      <td className="py-3 px-4 text-slate-300">{tx.date}</td>
-                      <td className="py-3 px-4 text-slate-300">{tx.description}</td>
-                      <td className="py-3 px-4 text-right font-semibold text-green-400">
-                        {new Intl.NumberFormat('id-ID', {
-                          style: 'currency',
-                          currency: 'IDR',
-                          minimumFractionDigits: 0,
-                        }).format(tx.amount)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="inline-block bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs">
-                          {tx.category}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                            tx.type === 'income'
-                              ? 'bg-green-900/50 text-green-300'
-                              : 'bg-red-900/50 text-red-300'
-                          }`}
-                        >
-                          {tx.type}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Summary Stats */}
-          {transactions.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-slate-600 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-slate-700/30 rounded-lg p-4">
-                <p className="text-slate-400 text-sm">Total Transactions</p>
-                <p className="text-2xl font-bold text-blue-400">{transactions.length}</p>
-              </div>
-              <div className="bg-slate-700/30 rounded-lg p-4">
-                <p className="text-slate-400 text-sm">Total Amount</p>
-                <p className="text-2xl font-bold text-green-400">
-                  {new Intl.NumberFormat('id-ID', {
-                    style: 'currency',
-                    currency: 'IDR',
-                    minimumFractionDigits: 0,
-                  }).format(transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0))}
-                </p>
-              </div>
-              <div className="bg-slate-700/30 rounded-lg p-4">
-                <p className="text-slate-400 text-sm">Last Updated</p>
-                <p className="text-2xl font-bold text-cyan-400">{new Date().toLocaleDateString()}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 text-center text-slate-500 text-sm">
-          <p>Numeri • IBM Agentic AI Hackathon • Stateless Data Processing</p>
-        </div>
+    <div className="w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full shadow-2xl z-10">
+      <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800">
+        <h3 className="font-semibold text-slate-200 flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
+          AI Architect Agent
+        </h3>
+        <Settings size={18} className="text-slate-500 cursor-pointer hover:text-cyan-400 transition-colors" />
       </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/50">
+        {messages.map((msg, idx) => (
+          <ChatBubble key={idx} {...msg} />
+        ))}
+        {isProcessing && (
+          <div className="flex justify-start">
+            <div className="bg-slate-800 border border-slate-700 p-3 rounded-xl rounded-bl-none shadow-sm flex items-center gap-2">
+              <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse-slow"></div>
+              <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse-slow delay-100"></div>
+              <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse-slow delay-200"></div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <form onSubmit={handleSubmit} className="p-4 bg-slate-800 border-t border-slate-700">
+        <div className="relative">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Tulis instruksi atau paste gambar (Ctrl+V)..."
+            className="w-full pl-4 pr-12 py-3 bg-slate-700 placeholder-slate-400 text-white focus:bg-slate-600 focus:border-cyan-500 border border-slate-700 rounded-xl text-sm outline-none transition-all shadow-inner"
+          />
+          <button
+            type="submit"
+            disabled={isProcessing}
+            className="absolute right-2 top-2 p-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+        <div className="mt-2 flex justify-between items-center text-xs text-slate-500">
+          <span className="flex items-center gap-1 cursor-default">
+            <ImageIcon size={12} className='text-cyan-400' /> Multimodal Input Ready (Ctrl+V)
+          </span>
+          <span className='font-mono'>Gemini 2.5 Flash</span>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// Custom keyframes for slower bounce (used in ChatInterface)
+const CustomStyles = () => (
+  <style>
+    {`
+            @keyframes pulse-slow {
+                0%, 100% { opacity: 1; }
+                50% { opacity: .4; }
+            }
+            .animate-pulse-slow {
+                animation: pulse-slow 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            .delay-100 { animation-delay: 0.1s; }
+            .delay-200 { animation-delay: 0.2s; }
+        `}
+  </style>
+);
+
+
+export default function App() {
+  // State
+  const [files, setFiles] = useState(MOCK_INITIAL_FILES);
+  const [activeFileName, setActiveFileName] = useState(null);
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Halo! Saya AI Architect. Silakan paste gambar laporan atau beri instruksi untuk mengubah data.' }
+  ]);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Derived State
+  const activeFile = files.find(f => f.name === activeFileName);
+
+  // Handlers
+  const handleUpdateFileContent = (newContent) => {
+    const updatedFiles = files.map(f =>
+      f.name === activeFileName ? { ...f, content: newContent } : f
+    );
+    setFiles(updatedFiles);
+  };
+
+  const handleSendMessage = async (text) => {
+    const newMsg = { role: 'user', content: text };
+    setMessages(prev => [...prev, newMsg]);
+    setIsProcessing(true);
+
+    setTimeout(() => {
+      let responseText = "Instruksi diterima. Saya sedang memproses data.";
+
+      if (text.toLowerCase().includes("buat") && text.toLowerCase().includes("file")) {
+        const newFileName = `laporan_${Date.now()}.json`;
+        const newFileContent = JSON.stringify([], null, 2);
+
+        setFiles(prev => [...prev, { name: newFileName, content: newFileContent }]);
+        responseText = `Berhasil membuat file data baru: ${newFileName}.`;
+        setActiveFileName(newFileName);
+      }
+
+      setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+      setIsProcessing(false);
+    }, 1500);
+  };
+
+  const handleCreateFile = () => {
+    const name = prompt("Masukkan nama file data baru (contoh: data_bulanan.json):", `new_data_${Date.now()}.json`);
+    if (name) {
+      if (files.some(f => f.name === name)) {
+        alert(`File bernama ${name} sudah ada.`);
+        return;
+      }
+      setFiles(prev => [...prev, { name, content: "[]" }]);
+      setActiveFileName(name);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `File kosong '${name}' berhasil dibuat dan dibuka. Silakan gunakan tombol "+ Add Column" dan "+ Add Row" untuk mulai mengisi data.`
+      }]);
+    }
+  };
+
+  const handleDeleteFile = (fileName) => {
+    if (window.confirm(`Yakin ingin menghapus file ${fileName}? Tindakan ini tidak dapat dibatalkan.`)) {
+      const updatedFiles = files.filter(f => f.name !== fileName);
+      setFiles(updatedFiles);
+
+      if (activeFileName === fileName) {
+        setActiveFileName(updatedFiles.length > 0 ? updatedFiles[0].name : null);
+      }
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `File '${fileName}' berhasil dihapus.`
+      }]);
+    }
+  };
+
+  // Paste Event Listener for Images
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const blob = items[i].getAsFile();
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            setMessages(prev => [...prev, {
+              role: 'user',
+              content: 'Menganalisis gambar ini...',
+              image: event.target.result
+            }]);
+
+            setIsProcessing(true);
+            setTimeout(() => {
+              setIsProcessing(false);
+              setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: 'Saya telah menganalisis gambar laporan tersebut. Saya siap mengubahnya menjadi data JSON. Apakah Anda ingin menyimpannya ke file yang sedang aktif atau membuat file baru?'
+              }]);
+            }, 2000);
+          };
+          reader.readAsDataURL(blob);
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, []);
+
+  return (
+    <div className="flex h-screen bg-slate-950 font-inter text-white overflow-hidden">
+      <CustomStyles />
+      <FileSidebar
+        files={files}
+        activeFile={activeFileName}
+        onSelectFile={setActiveFileName}
+        onCreateFile={handleCreateFile}
+      />
+
+      <div className="flex-1 flex flex-col h-full min-w-0">
+        <div className="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 shadow-xl z-20">
+          <div className="flex items-center gap-3">
+            <h2 className="font-bold text-cyan-400 font-mono tracking-wider">{activeFile?.name || "NO_FILE_OPENED"}</h2>
+            <span className="text-xs px-2 py-0.5 bg-slate-700 rounded-full text-slate-400 border border-slate-600">
+              Data Grid View
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Undo Last AI Action (Mock)">
+              <RotateCcw size={18} />
+            </button>
+            <button
+              onClick={() => activeFile && handleDeleteFile(activeFileName)}
+              className={`p-2 rounded-lg transition-colors ${activeFile ? 'text-red-400 hover:text-white hover:bg-red-800/50' : 'text-slate-600 cursor-not-allowed'}`}
+              title="Delete Active File"
+            >
+              <Trash2 size={18} />
+            </button>
+            <div className="h-6 w-px bg-slate-700 mx-2"></div>
+            <button className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg shadow-md shadow-green-900/50 transition-colors">
+              <Save size={16} /> Save
+            </button>
+          </div>
+        </div>
+
+        {activeFile ? (
+          <JsonGridEditor
+            content={activeFile.content}
+            onUpdateContent={handleUpdateFileContent}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-slate-500 bg-slate-900/50">
+            <p className="text-xl font-light">
+              <span className='text-cyan-500'>Select</span> atau <span className='text-cyan-500'>Buat</span> File Baru
+            </p>
+          </div>
+        )}
+      </div>
+
+      <ChatInterface
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        isProcessing={isProcessing}
+      />
     </div>
   );
 }

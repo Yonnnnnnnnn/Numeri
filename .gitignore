@@ -31,3 +31,4 @@ Thumbs.db
 # Misc
 .cache/
 .parcel-cache
+.vercel
