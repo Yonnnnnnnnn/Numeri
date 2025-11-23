@@ -350,9 +350,9 @@ export default function App() {
         'Content-Type': 'application/json',
       };
 
-      // Add AskOrchestrate header if using that mode
+      // Add ADK Agent header if using that mode
       if (aiMode === 'askOrchestrate') {
-        headers['X-Target-Agent'] = 'AskOrchestrate';
+        headers['X-Target-Agent'] = 'NumeriFinancialAgent';
       }
 
       const response = await fetch('/api/agent', {

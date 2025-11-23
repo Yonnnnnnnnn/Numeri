@@ -80,10 +80,10 @@ STRICT INSTRUCTION:
       key.toLowerCase().includes('data') && !key.toLowerCase().includes('base64')
     );
 
-    // Priority 1: AskOrchestrate Tasks (Explicit Target via Header)
-    if (req.headers['x-target-agent'] === 'AskOrchestrate') {
-      console.log('Routing to IBM watsonx Orchestrate (AskOrchestrate - Explicit Target)...');
-      result = await handleOrchestrateTask(req.body);
+    // Priority 1: ADK Agent Tasks (Explicit Target via Header)
+    if (req.headers['x-target-agent'] === 'NumeriFinancialAgent') {
+      console.log('Routing to IBM watsonx Orchestrate ADK Agent (NumeriFinancialAgent)...');
+      result = await handleADKAgentTask(req.body);
 
     }
     // Priority 2: Cross-File Tasks (Multiple Datasets)
@@ -194,7 +194,101 @@ async function getOrchestrateAccessToken() {
   }
 }
 
+/**
+ * Handle ADK Agent Tasks using IBM watsonx Orchestrate ADK Agent
+ * Uses the new ADK agent endpoint for financial analysis
+ */
+async function handleADKAgentTask(requestBody) {
+  console.log("Starting IBM watsonx Orchestrate ADK Agent Task");
 
+  try {
+    // Get API Key for authentication
+    const apiKey = process.env.ORCHESTRATE_API_KEY;
+    const agentName = process.env.ORCHESTRATE_AGENT_NAME; // This is the Agent ID: ce4cbf44-4736-4648-b6cf-5ed2c31791eb
+    const baseUrl = process.env.ORCHESTRATE_BASE_URL || "https://api.us-south.watson-orchestrate.cloud.ibm.com";
+
+    console.log("🔑 Using API Key for authentication");
+    console.log("🎯 Agent ID:", agentName);
+
+    // Get IAM token for Bearer authentication
+    const token = await getOrchestrateAccessToken();
+
+    // Prepare request payload
+    const userPrompt = requestBody.prompt || requestBody.text_prompt || "Analyze financial data";
+    let fullMessage = userPrompt;
+
+    // Include transaction data if available
+    if (requestBody.currentData && requestBody.currentData.length > 0) {
+      fullMessage = `${userPrompt}\n\nData Transaksi:\n${JSON.stringify(requestBody.currentData, null, 2)}`;
+    }
+
+    // ADK Agent endpoint - using the Chat API
+    const adkUrl = `${baseUrl}/v1/chat/completions`;
+
+    const payload = {
+      messages: [
+        {
+          role: "user",
+          content: fullMessage
+        }
+      ],
+      model: "numeri-financial-agent",
+      agent_id: agentName,
+      max_tokens: 2000
+    };
+
+    console.log("📤 Payload:", JSON.stringify(payload, null, 2));
+
+    // Make request with Bearer token
+    const response = await fetch(adkUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    console.log("📊 ADK Agent Response Status:", response.status);
+
+    // Error handling
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log("🔥 Error Response:", errorText);
+      throw new Error(`[ADK Agent Error] Status ${response.status}: ${errorText}`);
+    }
+
+    // Parse response
+    const responseData = await response.json();
+    console.log("✅ ADK Agent Response:", JSON.stringify(responseData, null, 2));
+
+    // Extract agent response
+    let agentExplanation = "No response from agent";
+    
+    if (responseData.choices && responseData.choices[0] && responseData.choices[0].message) {
+      agentExplanation = responseData.choices[0].message.content;
+    } else if (responseData.result) {
+      agentExplanation = responseData.result;
+    } else if (responseData.message) {
+      agentExplanation = responseData.message;
+    }
+
+    console.log("✅ Final Agent Response:", agentExplanation);
+
+    // Return structured response
+    return {
+      content: requestBody.currentData || [],
+      explanation: agentExplanation,
+      source: 'Numeri Financial Agent (ADK)',
+      isFilterView: false
+    };
+
+  } catch (error) {
+    console.error('ADK Agent Task Error:', error.message);
+    throw new Error(`ADK Agent failed: ${error.message}`);
+  }
+}
 
 /**
  * Handle Orchestrate Tasks using IBM watsonx Orchestrate /invoke endpoint
