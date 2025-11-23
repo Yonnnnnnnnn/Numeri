@@ -205,16 +205,9 @@ async function handleOrchestrateTask(requestBody) {
   console.log("Starting IBM watsonx Orchestrate Task (/invoke endpoint)");
 
   try {
-    // Otentikasi - Dapatkan IAM Access Token
-    let accessToken;
-    try {
-      accessToken = await getOrchestrateAccessToken();
-      console.log("✅ Using IAM Access Token");
-    } catch (iamError) {
-      console.log("⚠️ IAM Token failed, falling back to direct API Key");
-      console.log("🔑 IAM Error:", iamError.message);
-      accessToken = process.env.ORCHESTRATE_API_KEY;
-    }
+    // Get API Key for Basic Auth
+    const apiKey = process.env.ORCHESTRATE_API_KEY;
+    console.log("🔑 Using Basic Auth with API Key");
 
     // Get environment variables
     const agentId = process.env.ORCHESTRATE_AGENT_ID;
@@ -247,11 +240,14 @@ async function handleOrchestrateTask(requestBody) {
 
     console.log("📤 Payload:", JSON.stringify(payload, null, 2));
 
-    // Try Format 1 first
+    // Create Basic Auth header: base64 encode "apikey:{API_KEY}"
+    const basicAuth = Buffer.from(`apikey:${apiKey}`).toString('base64');
+
+    // Try Format 1 first with Basic Auth
     let response = await fetch(invokeUrl1, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Basic ${basicAuth}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json'  // Force JSON response
       },
@@ -267,7 +263,7 @@ async function handleOrchestrateTask(requestBody) {
       response = await fetch(invokeUrl2, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Basic ${basicAuth}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
