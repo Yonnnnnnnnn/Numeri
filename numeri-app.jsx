@@ -48,6 +48,40 @@ const mockProcessAI = async (currentData, imageBase64, prompt) => {
   });
 };
 
+// Real API function for Vercel backend
+const processWithRealAPI = async (currentData, imageBase64, prompt, aiMode) => {
+  const requestBody = {
+    prompt: prompt || 'Process financial data',
+    currentData: currentData,
+    budgetData: [], // Add if needed for cross-file analysis
+  };
+
+  if (imageBase64) {
+    requestBody.imageBase64 = imageBase64;
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add AskOrchestrate header if using that mode
+  if (aiMode === 'askOrchestrate') {
+    headers['X-Target-Agent'] = 'AskOrchestrate';
+  }
+
+  const response = await fetch('https://numeri-dusky.vercel.app/api/agent', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status} - ${response.statusText}`);
+  }
+
+  return await response.json();
+};
+
 export default function NumeriApp() {
   const [transactions, setTransactions] = useState([]);
   const [imageBase64, setImageBase64] = useState(null);
@@ -56,6 +90,7 @@ export default function NumeriApp() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [explanation, setExplanation] = useState('');
+  const [aiMode, setAiMode] = useState('gemini'); // 'gemini' or 'askOrchestrate'
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
 
@@ -107,7 +142,7 @@ export default function NumeriApp() {
     reader.readAsDataURL(file);
   };
 
-  // Process with mock AI
+  // Process with AI (Mock or Real API)
   const handleProcessAI = async () => {
     if (!imageBase64 && !prompt && transactions.length === 0) {
       setError('Please upload an image, enter a prompt, or load existing data first');
@@ -115,15 +150,23 @@ export default function NumeriApp() {
     }
 
     setLoading(true);
-    setStatus('Analyzing Document...');
+    setStatus(aiMode === 'askOrchestrate' ? 'Processing with AskOrchestrate...' : 'Processing with Gemini AI...');
     setError('');
 
     try {
-      const result = await mockProcessAI(transactions, imageBase64, prompt);
+      let result;
+      
+      if (aiMode === 'askOrchestrate') {
+        // Use real API for AskOrchestrate
+        result = await processWithRealAPI(transactions, imageBase64, prompt, aiMode);
+      } else {
+        // Use mock API for Gemini (for now)
+        result = await mockProcessAI(transactions, imageBase64, prompt);
+      }
 
-      setTransactions(result.content);
-      setExplanation(result.explanation);
-      setStatus('Processing complete!');
+      setTransactions(result.content || []);
+      setExplanation(result.explanation || 'Processing complete!');
+      setStatus(`${aiMode === 'askOrchestrate' ? 'AskOrchestrate' : 'Gemini'} processing complete!`);
       setImageBase64(null);
       setPrompt('');
 
@@ -134,7 +177,7 @@ export default function NumeriApp() {
 
       setTimeout(() => setStatus(''), 4000);
     } catch (err) {
-      setError('Error processing request. Please try again.');
+      setError(`Error processing with ${aiMode === 'askOrchestrate' ? 'AskOrchestrate' : 'Gemini'}: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -204,6 +247,45 @@ export default function NumeriApp() {
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 mb-8 backdrop-blur-sm">
           <h2 className="text-xl font-semibold mb-6 text-blue-300">Control Panel</h2>
 
+          {/* AI Mode Selector */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-300 mb-2">AI Processing Mode</label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => setAiMode('gemini')}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  aiMode === 'gemini'
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                  <span className="font-medium">Gemini AI</span>
+                </div>
+                <p className="text-xs mt-1 opacity-80">Mock processing (Local)</p>
+              </button>
+
+              <button
+                onClick={() => setAiMode('askOrchestrate')}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  aiMode === 'askOrchestrate'
+                    ? 'bg-purple-600 border-purple-500 text-white'
+                    : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-400"></div>
+                  <span className="font-medium">AskOrchestrate</span>
+                </div>
+                <p className="text-xs mt-1 opacity-80">IBM watsonx Orchestrate</p>
+              </button>
+            </div>
+            <div className="mt-2 text-xs text-slate-400">
+              Current mode: <span className="font-medium text-blue-300">{aiMode === 'askOrchestrate' ? 'AskOrchestrate (Production)' : 'Gemini AI (Mock)'}</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {/* Upload JSON */}
             <div>
@@ -261,7 +343,11 @@ export default function NumeriApp() {
             <button
               onClick={handleProcessAI}
               disabled={loading}
-              className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
+              className={`flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-lg transition-colors ${
+                aiMode === 'askOrchestrate'
+                  ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600'
+                  : 'bg-green-600 hover:bg-green-700 disabled:bg-slate-600'
+              } disabled:cursor-not-allowed text-white`}
             >
               {loading ? (
                 <>
@@ -271,7 +357,7 @@ export default function NumeriApp() {
               ) : (
                 <>
                   <Send className="w-5 h-5" />
-                  Process with AI
+                  {aiMode === 'askOrchestrate' ? 'Process with AskOrchestrate' : 'Process with Gemini AI'}
                 </>
               )}
             </button>
