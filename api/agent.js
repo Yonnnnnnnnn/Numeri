@@ -222,42 +222,60 @@ async function handleADKAgentTask(requestBody) {
       fullMessage = `${userPrompt}\n\nData Transaksi:\n${JSON.stringify(requestBody.currentData, null, 2)}`;
     }
 
-    // ADK Agent endpoint - using the Chat API
-    const adkUrl = `${baseUrl}/v1/chat/completions`;
+    // ADK Agent endpoint - try multiple possible endpoints
+    const possibleEndpoints = [
+      `${baseUrl}/v1/agents/${agentName}/chat`,
+      `${baseUrl}/v1/agents/${agentName}/invoke`,
+      `${baseUrl}/instances/${process.env.ORCHESTRATE_INSTANCE_ID}/agents/${agentName}/environments/${process.env.ORCHESTRATE_AGENT_ENVIRONMENT_ID}/invoke`,
+      `${baseUrl}/api/v1/agents/${agentName}/chat`
+    ];
 
     const payload = {
-      messages: [
-        {
-          role: "user",
-          content: fullMessage
-        }
-      ],
-      model: "numeri-financial-agent",
-      agent_id: agentName,
-      max_tokens: 2000
+      message: fullMessage
     };
 
     console.log("📤 Payload:", JSON.stringify(payload, null, 2));
 
-    // Make request with Bearer token
-    const response = await fetch(adkUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+    // Try each endpoint until one works
+    let response = null;
+    let workingEndpoint = null;
+
+    for (const endpoint of possibleEndpoints) {
+      console.log("🎯 Trying endpoint:", endpoint);
+      
+      try {
+        const testResponse = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        console.log("📊 Response Status:", testResponse.status);
+
+        if (testResponse.status === 200 || testResponse.status === 201) {
+          response = testResponse;
+          workingEndpoint = endpoint;
+          console.log("✅ Working endpoint found:", workingEndpoint);
+          break;
+        } else {
+          const errorText = await testResponse.text();
+          console.log("⚠️ Endpoint failed:", errorText.substring(0, 200));
+        }
+      } catch (error) {
+        console.log("⚠️ Endpoint error:", error.message);
+        continue;
+      }
+    }
+
+    if (!response) {
+      throw new Error(`[ADK Agent Error] All endpoints failed. Tried: ${possibleEndpoints.join(', ')}`);
+    }
 
     console.log("📊 ADK Agent Response Status:", response.status);
-
-    // Error handling
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log("🔥 Error Response:", errorText);
-      throw new Error(`[ADK Agent Error] Status ${response.status}: ${errorText}`);
-    }
 
     // Parse response
     const responseData = await response.json();
