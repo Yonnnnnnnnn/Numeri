@@ -26,104 +26,36 @@ const ORCHESTRATE_INVOKE_PATH = process.env.ORCHESTRATE_INVOKE_PATH || "/orchest
 // Bangun URL endpoint Orchestrate penuh
 const ORCHESTRATE_ENDPOINT = `${ORCHESTRATE_BASE_URL}${ORCHESTRATE_INVOKE_PATH}${ORCHESTRATE_AGENT_NAME}`;
 
+// AI IDE Prompt: Modifikasi sementara api/agent.js untuk menguji pembacaan ENV vars
+
+/*
+Tugas: Ganti seluruh logika handler() (di dalam module.exports.handler = async (req, res) => { ... })
+dengan kode sederhana ini untuk memverifikasi apakah Vercel dapat membaca ENV vars.
+*/
+
+const ORCHESTRATE_API_KEY = process.env.ORCHESTRATE_API_KEY;
+const ORCHESTRATE_INVOKE_PATH = process.env.ORCHESTRATE_INVOKE_PATH;
+
 export default async function handler(req, res) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    // Robust Destructuring: Check multiple possible keys for image
-    const { currentData, prompt } = req.body;
-    // Check possible keys for the image
-    const imageBase64 = req.body.imageBase64 || req.body.image || req.body.file || req.body.attachment;
-    
-    // Debug Log: Verify what keys we're receiving
-    console.log("Incoming Payload Keys:", Object.keys(req.body));
-    console.log("Image Detected:", !!imageBase64);
-
-    // Validate payload size (Vercel limit: 4.5MB)
-    const payloadSize = JSON.stringify(req.body).length;
-    if (payloadSize > 4.5 * 1024 * 1024) {
-      return res.status(413).json({
-        error: 'Payload too large. Maximum 4.5MB allowed.',
-      });
-    }
-
-    // FORCE AUTO-EXECUTE FOR VISION
-    let processedPrompt = prompt;
-    if (imageBase64 && (!prompt || prompt.trim() === "")) {
-        console.log("Image detected with empty prompt. Injecting default execution prompt.");
-        processedPrompt = `
-STRICT INSTRUCTION: 
-1. Analyze the attached image (Receipt/Invoice). 
-2. Extract Date, Total Amount, Merchant, and Items.
-3. AUTOMATICALLY APPEND this as a new transaction to the 'journal_lines' or 'transactions' array in the JSON.
-4. Use logic to determine Debit (Expense/Asset) and Credit (Cash/AP) accounts.
-5. Return ONLY the fully updated JSON. Do not ask for confirmation.
-`;
-    }
-
-    let result;
-
-    // --- Modifikasi di dalam fungsi handler() ---
-
-    // Filter keys untuk menghitung jumlah dataset yang masuk (tidak termasuk image dan prompt)
-    const dataKeys = Object.keys(req.body).filter(key => 
-        key.toLowerCase().includes('data') && !key.toLowerCase().includes('base64')
-    );
-
-    if (imageBase64) {
-        // Jalur 1: Vision Task (Logic Lama)
-        // Panggil Gemini Vision Agent
-        console.log('Routing to Gemini 2.5 Flash-Lite for vision task...');
-        result = await handleVisionTask(currentData, imageBase64, processedPrompt);
-        
-    } else if (dataKeys.length >= 2) {
-        // Jalur 2: Cross-File Task -> Panggil IBM watsonx Orchestrate
-        
-        console.log(`Routing request to Orchestrate Agent: ${ORCHESTRATE_ENDPOINT}`);
-
-        // Kirim seluruh body request (semua data dan prompt) ke Orchestrate
-        const orchestrateResponse = await fetch(ORCHESTRATE_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                // Menggunakan API Key Orchestrate sebagai Bearer Token
-                'Authorization': `Bearer ${ORCHESTRATE_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(req.body)
-        });
-        
-        if (!orchestrateResponse.ok) {
-            // Log error rinci
-            const errorText = await orchestrateResponse.text();
-            console.error('Orchestrate API Error:', orchestrateResponse.status, errorText);
-            throw new Error(`Orchestrate API failed with status ${orchestrateResponse.status}. Detail: ${errorText.substring(0, 100)}...`);
-        }
-        
-        // Asumsi: Orchestrate mengembalikan JSON yang valid
-        result = await orchestrateResponse.json();
-
-    } else {
-        // Jalur 3: Single Logic Task (Logic Lama)
-        // Panggil Gemini Logic Agent
-        console.log('Routing to Gemini 2.5 Flash-Lite for single logic task...');
-        result = await handleLogicTask(currentData, processedPrompt);
-    }
-
-    // Return parsed JSON response
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error('Error in hybrid AI agent:', error);
-
-    // Return error with details in development mode
-    return res.status(500).json({
-      error: 'Error processing request. Please try again.',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    // === Logic Tes Sederhana: Hapus ini setelah debugging ===
+    return res.status(200).json({
+        status: "Testing ENV Vars",
+        orchestrate_base_url: process.env.ORCHESTRATE_BASE_URL,
+        orchestrate_api_key_status: ORCHESTRATE_API_KEY ? "Loaded" : "FAILED (null/undefined)",
+        orchestrate_agent_name: process.env.ORCHESTRATE_AGENT_NAME,
+        orchestrate_invoke_path: ORCHESTRATE_INVOKE_PATH,
+        gemini_api_key_status: process.env.GEMINI_API_KEY ? "Loaded" : "FAILED (null/undefined)",
+        vercel_proxy_url: process.env.VITE_VERCEL_PROXY_URL,
+        all_env_keys: Object.keys(process.env).filter(key => 
+            key.includes('ORCHESTRATE') || 
+            key.includes('GEMINI') || 
+            key.includes('VITE_')
+        )
     });
-  }
-}
+    // =======================================================
+    
+    // ... (Lanjutkan dengan logika yang ada sebelumnya, yang sekarang diabaikan)
+};
 
 /**
  * Handle Vision Tasks using Gemini 2.5 Flash-Lite with native multimodal support
