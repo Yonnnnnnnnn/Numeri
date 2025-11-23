@@ -1,9 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Variabel Caching Token untuk IBM watsonx Orchestrate IAM
+let cachedOrchestrateToken = null;
+let tokenExpiryTime = 0;
+
 /**
  * Vercel Serverless Function: Hybrid AI System (IBM watsonx Orchestrate + Google Gemini)
  * 
- * This function implements a 3-way routing architecture:
+ * This function implements a 4-way intelligent routing architecture:
+ * - AskOrchestrate Tasks (Explicit Target): IBM watsonx Orchestrate (X-Target-Agent header)
  * - Vision Tasks (Image Processing): Google Gemini 2.5 Flash-Lite (Multimodal)
  * - Cross-File Tasks (Multiple Datasets): IBM watsonx Orchestrate NumeriCrossFileAgent
  * - Single Logic Tasks: Google Gemini 2.5 Flash-Lite
@@ -12,6 +17,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
  * - ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate instance URL
  * - ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API Key (Bearer Token)
  * - ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name
+ * - ORCHESTRATE_INVOKE_PATH: Path untuk invoke agent (default: "/orchestrate/api/v1/invoke/agents/")
  * - GEMINI_API_KEY: Google Gemini API key for text/logic tasks
  */
 
@@ -34,13 +40,14 @@ export default async function handler(req, res) {
 
   try {
     // Robust Destructuring: Check multiple possible keys for image
-    const { currentData, prompt } = req.body;
+    const { currentData, prompt, text_prompt } = req.body;
     // Check possible keys for the image
     const imageBase64 = req.body.imageBase64 || req.body.image || req.body.file || req.body.attachment;
     
     // Debug Log: Verify what keys we're receiving
     console.log("Incoming Payload Keys:", Object.keys(req.body));
     console.log("Image Detected:", !!imageBase64);
+    console.log("Target Agent Header:", req.headers['x-target-agent']);
 
     // Validate payload size (Vercel limit: 4.5MB)
     const payloadSize = JSON.stringify(req.body).length;
@@ -66,50 +73,43 @@ STRICT INSTRUCTION:
 
     let result;
 
-    // --- Modifikasi di dalam fungsi handler() ---
-
+    // --- 4-Way Intelligent Routing Logic ---
+    
     // Filter keys untuk menghitung jumlah dataset yang masuk (tidak termasuk image dan prompt)
     const dataKeys = Object.keys(req.body).filter(key => 
         key.toLowerCase().includes('data') && !key.toLowerCase().includes('base64')
     );
 
-    if (imageBase64) {
-        // Jalur 1: Vision Task (Logic Lama)
-        // Panggil Gemini Vision Agent
+    // Priority 1: AskOrchestrate Tasks (Explicit Target via Header)
+    if (req.headers['x-target-agent'] === 'AskOrchestrate') {
+        console.log('Routing to IBM watsonx Orchestrate (AskOrchestrate - Explicit Target)...');
+        result = await handleOrchestrateTask(req.body);
+        
+    } 
+    // Priority 2: Cross-File Tasks (Multiple Datasets)
+    else if (dataKeys.length >= 2) {
+        console.log(`Routing to IBM watsonx Orchestrate (Cross-File Analysis): ${ORCHESTRATE_ENDPOINT}`);
+        result = await handleOrchestrateTask(req.body);
+        
+    } 
+    // Priority 3: Vision Tasks (Image Processing)
+    else if (imageBase64) {
         console.log('Routing to Gemini 2.5 Flash-Lite for vision task...');
         result = await handleVisionTask(currentData, imageBase64, processedPrompt);
         
-    } else if (dataKeys.length >= 2) {
-        // Jalur 2: Cross-File Task -> Panggil IBM watsonx Orchestrate
-        
-        console.log(`Routing request to Orchestrate Agent: ${ORCHESTRATE_ENDPOINT}`);
-
-        // Kirim seluruh body request (semua data dan prompt) ke Orchestrate
-        const orchestrateResponse = await fetch(ORCHESTRATE_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                // Menggunakan API Key Orchestrate sebagai Bearer Token
-                'Authorization': `Bearer ${ORCHESTRATE_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(req.body)
-        });
-        
-        if (!orchestrateResponse.ok) {
-            // Log error rinci
-            const errorText = await orchestrateResponse.text();
-            console.error('Orchestrate API Error:', orchestrateResponse.status, errorText);
-            throw new Error(`Orchestrate API failed with status ${orchestrateResponse.status}. Detail: ${errorText.substring(0, 100)}...`);
-        }
-        
-        // Asumsi: Orchestrate mengembalikan JSON yang valid
-        result = await orchestrateResponse.json();
-
-    } else {
-        // Jalur 3: Single Logic Task (Logic Lama)
-        // Panggil Gemini Logic Agent
+    } 
+    // Priority 4: Logic Tasks (Text Processing)
+    else if (prompt || text_prompt) {
         console.log('Routing to Gemini 2.5 Flash-Lite for single logic task...');
-        result = await handleLogicTask(currentData, processedPrompt);
+        result = await handleLogicTask(currentData, prompt || text_prompt);
+        
+    } 
+    // Handle Invalid Input
+    else {
+        return res.status(400).json({
+            error: 'Invalid input format. Please check your data.',
+            explanation: 'No valid input detected. Please provide image, text prompt, or data.'
+        });
     }
 
     // Return parsed JSON response
@@ -117,11 +117,189 @@ STRICT INSTRUCTION:
   } catch (error) {
     console.error('Error in hybrid AI agent:', error);
 
+    // Specific error handling for different cases
+    let errorMessage = 'Error processing request. Please try again.';
+    let statusCode = 500;
+    
+    if (error.message && error.message.includes('Orchestrate API failed')) {
+      errorMessage = 'Orchestrate API failed - Check IBM configuration';
+      statusCode = 502; // Bad Gateway
+    } else if (error.message && error.message.includes('Otentikasi IBM Cloud gagal')) {
+      errorMessage = error.message; // IAM token specific error
+      statusCode = 401; // Unauthorized
+    } else if (error.message && error.message.includes('Gemini')) {
+      errorMessage = 'Gemini API unavailable - Check configuration';
+      statusCode = 502; // Bad Gateway
+    }
+
     // Return error with details in development mode
-    return res.status(500).json({
-      error: 'Error processing request. Please try again.',
+    return res.status(statusCode).json({
+      error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+}
+
+/**
+ * Mengambil token akses IAM, menggunakan cache jika token masih valid (dengan buffer 5 menit).
+ */
+async function getOrchestrateAccessToken() {
+    const ORCHESTRATE_API_KEY = process.env.ORCHESTRATE_API_KEY;
+
+    // Cek apakah token masih ada dan belum kadaluarsa (misalnya, 5 menit/300000ms sebelum expire)
+    if (cachedOrchestrateToken && Date.now() < tokenExpiryTime - 300000) {
+        // console.log('Menggunakan token IAM dari cache.');
+        return cachedOrchestrateToken;
+    }
+
+    // console.log('Token IAM kadaluarsa atau tidak ada. Mengambil token baru...');
+    
+    const formData = new URLSearchParams();
+    formData.append('grant_type', 'urn:ibm:params:oauth:grant-type:apikey');
+    formData.append('apikey', ORCHESTRATE_API_KEY);
+
+    try {
+        const response = await fetch('https://iam.cloud.ibm.com/identity/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`[IAM Token Error] Status ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        // Simpan token baru dan hitung waktu kedaluwarsa
+        cachedOrchestrateToken = data.access_token;
+        tokenExpiryTime = Date.now() + (data.expires_in * 1000);
+
+        // DEBUG: Tampilkan token untuk development
+        console.log('=== IAM ACCESS TOKEN DEBUG ===');
+        console.log('Token:', cachedOrchestrateToken);
+        console.log('Expires in:', data.expires_in, 'seconds');
+        console.log('Expires at:', new Date(tokenExpiryTime).toISOString());
+        console.log('==============================');
+
+        return cachedOrchestrateToken;
+
+    } catch (error) {
+        // Logika error handling khusus untuk IAM token
+        console.error('Fatal Error IAM Token:', error.message);
+        throw new Error(`Otentikasi IBM Cloud gagal. Cek API Key dan Service URL: ${error.message}`);
+    }
+}
+
+/**
+ * Handle Orchestrate Tasks using IBM watsonx Orchestrate
+ * Processes both AskOrchestrate (explicit target) and Cross-File Analysis requests
+ */
+async function handleOrchestrateTask(requestBody) {
+  console.log("Starting IBM watsonx Orchestrate Task");
+  
+  try {
+    // --- MODIFIKASI DIMULAI DI SINI ---
+    // 1. Dapatkan IAM Access Token (dengan logic caching)
+    let accessToken;
+    try {
+      accessToken = await getOrchestrateAccessToken();
+      console.log("✅ Using IAM Access Token");
+    } catch (iamError) {
+      console.log("⚠️ IAM Token failed, falling back to direct API Key");
+      console.log("🔑 IAM Error:", iamError.message);
+      // Fallback: Gunakan API Key langsung
+      accessToken = process.env.ORCHESTRATE_API_KEY;
+    }
+
+    // 2. Konstruksi URL Orchestrate (sesuai spec)
+    const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL;
+    const ORCHESTRATE_AGENT_NAME = process.env.ORCHESTRATE_AGENT_NAME;
+    // Gunakan path dari spec: /orchestrate/api/v1/invoke/agents/
+    const ORCHESTRATE_URL = `${ORCHESTRATE_BASE_URL}/orchestrate/api/v1/invoke/agents/${ORCHESTRATE_AGENT_NAME}`;
+    
+    console.log("🎯 Target URL:", ORCHESTRATE_URL);
+    
+    // Kirim seluruh body request ke Orchestrate endpoint dengan Access Token
+    // Format body sesuai spec: { "input": { ... } }
+    const orchestratePayload = {
+        input: requestBody
+    };
+    
+    console.log("📤 Payload:", JSON.stringify(orchestratePayload, null, 2));
+    
+    const orchestrateResponse = await fetch(ORCHESTRATE_URL, {
+        method: 'POST',
+        headers: {
+            // MENGGUNAKAN Access Token SEBAGAI Bearer Token
+            'Authorization': `Bearer ${accessToken}`, 
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orchestratePayload)
+    });
+    
+    if (!orchestrateResponse.ok) {
+        // Log error rinci
+        const errorText = await orchestrateResponse.text();
+        console.error('Orchestrate API Error:', orchestrateResponse.status, errorText);
+        throw new Error(`Orchestrate API failed with status ${orchestrateResponse.status}`);
+    }
+    
+    // Ambil respons dari Orchestrate
+    const orchestrateResult = await orchestrateResponse.json();
+    
+    // Post-processing: Enforce API Contract untuk response konsisten
+    let finalResponse;
+    
+    // Jika Orchestrate mengembalikan jawaban teks murni, bungkus dalam struktur standar
+    if (typeof orchestrateResult === 'string' || (orchestrateResult.text && typeof orchestrateResult.text === 'string')) {
+        const orchestrateText = orchestrateResult.text || orchestrateResult;
+        finalResponse = {
+            // 'filename' dan 'content' diisi dengan data yang dikirim user untuk menjaga state
+            "filename": requestBody.filename || "transactions_updated.json",
+            "content": requestBody.content || requestBody.currentData || [], // Kembalikan array content lama/kosong
+            "explanation": orchestrateText // Masukkan jawaban Orchestrate ke sini
+        };
+    } 
+    // Jika Orchestrate sudah mengembalikan struktur JSON yang benar, gunakan langsung
+    else if (orchestrateResult.content && Array.isArray(orchestrateResult.content)) {
+        finalResponse = {
+            "filename": orchestrateResult.filename || "transactions_updated.json",
+            "content": orchestrateResult.content,
+            "explanation": orchestrateResult.explanation || "Processing complete."
+        };
+    }
+    // Fallback untuk respons tidak terduga
+    else {
+        finalResponse = {
+            "filename": requestBody.filename || "transactions_updated.json",
+            "content": requestBody.content || requestBody.currentData || [],
+            "explanation": JSON.stringify(orchestrateResult)
+        };
+    }
+    
+    console.log("Orchestrate Task Result:", finalResponse);
+    return finalResponse;
+    
+  } catch (error) {
+    console.error('Orchestrate processing error:', error);
+    
+    // Error handling: Kembalikan response dengan data lama + explanation
+    let errorMessage = "Orchestrate API failed - Check IBM configuration";
+    
+    // Jika error terkait IAM token, berikan pesan yang lebih spesifik
+    if (error.message && error.message.includes('Otentikasi IBM Cloud gagal')) {
+        errorMessage = error.message;
+    }
+    
+    return {
+        "filename": requestBody.filename || "transactions_updated.json",
+        "content": requestBody.content || requestBody.currentData || [],
+        "explanation": errorMessage
+    };
   }
 }
 

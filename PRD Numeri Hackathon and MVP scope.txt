@@ -62,6 +62,17 @@ Return ONLY this JSON structure (no markdown, no explanations outside JSON):
   "content": [array of updated rows],
   "explanation": "Penjelasan perubahan dalam Bahasa Indonesia"
 }
+
+## 5.3 Orchestrate Agent (IBM watsonx Orchestrate)
+* Name: NumeriCrossFileAgent
+* Model: IBM watsonx Orchestrate
+* Role: Cross-File Analysis dan Multi-Dataset Processing
+* Environment Variables:
+  - ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate instance URL
+  - ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API Key (Bearer Token)
+  - ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name
+  - ORCHESTRATE_INVOKE_PATH: Path untuk invoke agent (default: "/orchestrate/api/v1/invoke/agents/")
+
 6. Data Architecture (In-Memory Schemas)
 Struktur data yang diharapkan dari upload user dan output AI.
 A. transactions.json
@@ -76,7 +87,6 @@ A. transactions.json
   }
 ]
 
-
 B. custom_schemas.json (Optional Upload)
 User bisa mengupload file ini bersamaan untuk memberitahu AI tentang kolom tambahan.
 {
@@ -84,7 +94,6 @@ User bisa mengupload file ini bersamaan untuk memberitahu AI tentang kolom tamba
     "transactions": { "tax_deductible": "boolean" }
   }
 }
-
 
 7. Architecture Diagram (Stateless Flow)
 graph LR
@@ -99,28 +108,37 @@ graph LR
     end
     
     subgraph Google [Google Cloud]
-        Agent[Gemini AI]
+        GeminiAgent[Gemini AI]
         Gemini[Gemini 2.5 Flash-Lite]
     end
-
+    
+    subgraph IBM [IBM Cloud]
+        Orchestrate[IBM watsonx Orchestrate]
+        CrossFileAgent[NumeriCrossFileAgent]
+    end
 
     User --1. Upload File--> Browser
     Browser --2. Parse to Memory--> Browser
     User --3. Trigger AI (Prompt/Image)--> Browser
     Browser --4. JSON + Image (Base64)--> Proxy
-    Proxy --5. Secure Request--> Agent
-    Agent --6. Inference--> Gemini
-    Gemini --7. Full JSON Result--> Agent
-    Agent --8. Response--> Proxy
+    Proxy --5a. Route to Vision--> GeminiAgent
+    Proxy --5b. Route to Cross-File--> Orchestrate
+    Proxy --5c. Route to Logic--> GeminiAgent
+    GeminiAgent --6a. Inference--> Gemini
+    Orchestrate --6b. Processing--> CrossFileAgent
+    Gemini --7a. Vision Result--> GeminiAgent
+    CrossFileAgent --7b. Cross-File Result--> Orchestrate
+    GeminiAgent --8a. Response--> Proxy
+    Orchestrate --8b. Response--> Proxy
     Proxy --9. Update State--> Browser
     Browser --10. Render Grid--> User
     User --11. Click Download--> File
-
 
 8. Deliverables
 1. Vercel Project: URL publik yang bisa diakses juri.
 2. Source Code: Repository GitHub bersih tanpa API Key.
 3. Demo Assets: Contoh file sample_receipt.jpg dan sample_data.json untuk mempermudah pengujian juri.
+
 9. Non-Functional Requirements (NFR)
 Security
 * Zero-State: Tidak ada database. Jika user refresh halaman, data hilang (kecuali di-download sebelumnya). Ini adalah fitur Keamanan dan Privasi, bukan bug.
@@ -139,7 +157,8 @@ Error Case
 	Jika user menekan "Process" tanpa upload apapun, kirim array kosong [] ke AI sebagai start awal.
 	Gemini Timeout
 	Jika Gemini memakan waktu > 30 detik (limit Vercel Pro Plan), tampilkan: "Process timed out. Try smaller image."
-	10. Acceptance Criteria & Success Metrics
+
+10. Acceptance Criteria & Success Metrics
 Acceptance Criteria (MVP)
 1. File Upload: Sistem menerima upload transactions.json valid dan menampilkannya di tabel.
 2. Vision-to-Data: User upload gambar struk → Sistem menambah baris baru di tabel dengan nominal yang benar.
@@ -150,25 +169,33 @@ Success Metrics
 1. Demo Smoothness: Presentasi berjalan tanpa error "Permission Denied" atau isu browser compatibility.
 2. Accuracy: 3 dari 3 percobaan upload struk menghasilkan angka amount yang tepat.
 
-
 11. API Contract – Gemini AI Integration
 This section defines the mandatory contract between the Vercel Serverless Proxy and the Google Gemini AI deployment. The Vercel function is responsible for pre-processing, authentication (API Key management), and post-processing the final response.
 
 ## 11.1 Environment Variables Required
 - GEMINI_API_KEY: Google Gemini API key for authentication
-- No additional authentication tokens required (simpler than IBM IAM)
+- ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate instance URL
+- ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API Key (Bearer Token)
+- ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name
+- ORCHESTRATE_INVOKE_PATH: Path untuk invoke agent (default: "/orchestrate/api/v1/invoke/agents/")
 
 ## 11.2 Agent Routing Logic
-The Vercel Proxy implements intelligent routing based on input type:
+The Vercel Proxy implements 3-way intelligent routing based on input type:
 
 ### Vision Tasks (Image Processing)
-- **Trigger**: imageBase64 present in request
+- **Trigger**: imageBase64 present in request (keys: imageBase64, image, file, attachment)
 - **Model**: gemini-2.5-flash-lite (multimodal)
 - **Function**: handleVisionTask()
 - **Process**: Extract receipt data → Generate UUID → Append to JSON array
 
+### Cross-File Tasks (Multiple Datasets)
+- **Trigger**: dataKeys.length >= 2 (multiple datasets with 'data' in key name)
+- **Model**: IBM watsonx Orchestrate NumeriCrossFileAgent
+- **Function**: ORCHESTRATE_ENDPOINT (constructed from environment variables)
+- **Process**: Send entire request body to Orchestrate → Multi-dataset analysis → Return structured JSON
+
 ### Logic Tasks (Text Processing)
-- **Trigger**: text prompt only (no image)
+- **Trigger**: text prompt only (no image, single dataset)
 - **Model**: gemini-2.5-flash-lite
 - **Function**: handleLogicTask()
 - **Process**: Apply accounting rules → Update JSON schema → Return full dataset
@@ -185,6 +212,8 @@ Both agents return consistent JSON structure:
 
 ## 11.4 Error Handling
 - **API Key Error**: Return "Gemini API unavailable - Check configuration"
+- **Orchestrate API Error**: Return "Orchestrate API failed - Check IBM configuration"
 - **Timeout**: Return "Process timed out. Try smaller image."
 - **Invalid Input**: Return "Invalid input format. Please check your data."
 - **Vision Fail**: Return original data + "Image unclear" explanation
+- **Cross-File Fail**: Return original data + "Cross-file analysis failed" explanation
