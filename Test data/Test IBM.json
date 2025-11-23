@@ -1,0 +1,34 @@
+[
+  {
+    "id": "a1b2-c3d4",
+    "date": "2024-05-01",
+    "description": "Software Subscription (Q2)",
+    "amount": 1500000,
+    "category": "Software",
+    "type": "expense"
+  },
+  {
+    "id": "e5f6-g7h8",
+    "date": "2024-05-15",
+    "description": "Revenue from Client A",
+    "amount": 5000000,
+    "category": "Sales",
+    "type": "income"
+  },
+  {
+    "id": "i9j0-k1l2",
+    "date": "2024-05-20",
+    "description": "Server Maintenance",
+    "amount": 2000000,
+    "category": "Software",
+    "type": "expense"
+  },
+  {
+    "id": "m3n4-o5p6",
+    "date": "2024-06-05",
+    "description": "Revenue from Client B",
+    "amount": 1000000,
+    "category": "Sales",
+    "type": "income"
+  }
+]

@@ -57,6 +57,65 @@ CURRENT JSON DATASET:
 User Command: {USER_PROMPT}
 
 Return ONLY this JSON structure (no markdown, no explanations outside JSON):
+* Request diteruskan ke Gemini AI System.
+   * Agent Numeri mengekstrak data dari gambar menggunakan Gemini 2.5 Flash-Lite (Multimodal).
+   * Agent menggabungkan data baru ke dalam array JSON yang ada dengan validasi akuntansi double-entry.
+4. Review: Hasil JSON baru ditampilkan di Grid Editor. User bisa melihat baris baru yang ditambahkan AI.
+5. Download: User mengklik tombol "Download JSON" untuk menyimpan file numeri_transactions_20251123.json ke komputer.
+4. Functional Requirements
+ID
+	Requirement
+	Deskripsi Teknis
+	FR-01
+	Gemini AI Agent Config
+	Agent Gemini 2.5 Flash-Lite dikonfigurasi untuk menerima input teks/gambar dan SELALU mengembalikan full JSON object.
+	FR-02
+	Secure Proxy
+	Middleware Vercel (/api/agent) menangani API Key Google Gemini dan menyembunyikan credential.
+	FR-03
+	Vision Handling
+	Konversi gambar upload ke Base64 di client-side sebelum dikirim ke API.
+	FR-04
+	Schema Enforcement
+	Agent memvalidasi output terhadap skema JSON sebelum dikirim balik ke UI.
+	FR-05
+	File Upload Handling
+	Parsing file .json yang diupload user ke dalam variabel state React (Memory Buffer).
+	FR-06
+	Download Generation
+	Mengubah state React kembali menjadi file .json (URL.createObjectURL) saat user klik Download.
+	FR-07
+	Stateless Processing
+	Server tidak boleh menyimpan file user. Data hanya hidup selama sesi browser aktif.
+5. Konfigurasi Agent (Gemini AI System)
+Konfigurasi ini memastikan AI mengembalikan file utuh, meminimalisir logika rumit di frontend.
+
+## 5.1 Vision Agent (Gemini 2.5 Flash-Lite)
+* Name: Numeri Vision Agent
+* Model: Gemini 2.5 Flash-Lite (Multimodal)
+* Role: Receipt OCR dan Data Extraction
+* Instructions:
+Extract receipt data (Date, Merchant, Amount, Items) into strict JSON format. Generate UUID and append to existing array.
+
+## 5.2 Logic Agent (Gemini 2.5 Flash-Lite)
+* Name: Numeri Logic Agent
+* Model: Gemini 2.5 Flash-Lite
+* Role: JSON Manipulation dan Accounting Logic
+* Instructions (System Prompt):
+You are Numeri, an Expert AI Accountant.
+
+Rules:
+1. **Double-Entry:** Translate user intent into strict Journal Entries (Debit/Credit).
+2. **Structure:** If user asks to change columns, restructure the JSON schema.
+3. **Math:** Calculate balances accurately.
+4. **Output:** Return ONLY the valid updated JSON dataset matching the schema.
+
+CURRENT JSON DATASET:
+{DYNAMIC_DATA_INJECTION}
+
+User Command: {USER_PROMPT}
+
+Return ONLY this JSON structure (no markdown, no explanations outside JSON):
 {
   "filename": "transactions_updated.json",
   "content": [array of updated rows],
@@ -64,14 +123,14 @@ Return ONLY this JSON structure (no markdown, no explanations outside JSON):
 }
 
 ## 5.3 Orchestrate Agent (IBM watsonx Orchestrate)
-* Name: NumeriCrossFileAgent
+* Name: Numeri Orchestration Agent (AskOrchestrate & Cross-File)
 * Model: IBM watsonx Orchestrate
-* Role: Cross-File Analysis dan Multi-Dataset Processing
+* Role: **Multi-Purpose Agentic Router (AskOrchestrate)** dan Cross-File Analysis
 * Environment Variables:
-  - ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate instance URL
-  - ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API Key (Bearer Token)
-  - ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name
-  - ORCHESTRATE_INVOKE_PATH: Path untuk invoke agent (default: "/orchestrate/api/v1/invoke/agents/")
+  - ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate instance URL (Endpoint Embed on your website)
+  - ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API Key
+  - ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name (e.g., AskOrchestrate)
+  - ORCHESTRATE_INVOKE_PATH: Path untuk invoke agent (Endpoint Embed)
 
 6. Data Architecture (In-Memory Schemas)
 Struktur data yang diharapkan dari upload user dan output AI.
@@ -174,28 +233,35 @@ This section defines the mandatory contract between the Vercel Serverless Proxy 
 
 ## 11.1 Environment Variables Required
 - GEMINI_API_KEY: Google Gemini API key for authentication
-- ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate instance URL
-- ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API Key (Bearer Token)
+- ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate instance URL (Endpoint Embed)
+- ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API Key (Digunakan oleh Endpoint Embed)
 - ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name
-- ORCHESTRATE_INVOKE_PATH: Path untuk invoke agent (default: "/orchestrate/api/v1/invoke/agents/")
+- ORCHESTRATE_INVOKE_PATH: Path untuk invoke agent (Endpoint Embed)
 
 ## 11.2 Agent Routing Logic
-The Vercel Proxy implements 3-way intelligent routing based on input type:
+The Vercel Proxy implements **4-way intelligent routing** based on input type and explicit header target:
 
-### Vision Tasks (Image Processing)
-- **Trigger**: imageBase64 present in request (keys: imageBase64, image, file, attachment)
+### 1. AskOrchestrate Tasks (Explicit Target)
+- **Trigger**: HTTP Header `X-Target-Agent: 'AskOrchestrate'` is present in request.
+- **Priority**: Highest (overrides all other triggers).
+- **Model**: IBM watsonx Orchestrate AskOrchestrate Agent
+- **Function**: handleOrchestrateTask()
+- **Process**: Send user prompt to Orchestrate Embed Endpoint.
+
+### 2. Cross-File Tasks (Multiple Datasets)
+- **Trigger**: `dataKeys.length >= 2` (multiple datasets with 'data' in key name) **AND** no explicit header target.
+- **Model**: IBM watsonx Orchestrate Numeri Orchestration Agent
+- **Function**: handleOrchestrateTask()
+- **Process**: Send entire request body to Orchestrate → Multi-dataset analysis → Return structured JSON
+
+### 3. Vision Tasks (Image Processing)
+- **Trigger**: `imageBase64` present in request (keys: imageBase64, image, file, attachment) **AND** no explicit header target.
 - **Model**: gemini-2.5-flash-lite (multimodal)
 - **Function**: handleVisionTask()
 - **Process**: Extract receipt data → Generate UUID → Append to JSON array
 
-### Cross-File Tasks (Multiple Datasets)
-- **Trigger**: dataKeys.length >= 2 (multiple datasets with 'data' in key name)
-- **Model**: IBM watsonx Orchestrate NumeriCrossFileAgent
-- **Function**: ORCHESTRATE_ENDPOINT (constructed from environment variables)
-- **Process**: Send entire request body to Orchestrate → Multi-dataset analysis → Return structured JSON
-
-### Logic Tasks (Text Processing)
-- **Trigger**: text prompt only (no image, single dataset)
+### 4. Logic Tasks (Text Processing)
+- **Trigger**: text prompt only (no image, single dataset) **AND** no explicit header target.
 - **Model**: gemini-2.5-flash-lite
 - **Function**: handleLogicTask()
 - **Process**: Apply accounting rules → Update JSON schema → Return full dataset
@@ -212,7 +278,8 @@ Both agents return consistent JSON structure:
 
 ## 11.4 Error Handling
 - **API Key Error**: Return "Gemini API unavailable - Check configuration"
-- **Orchestrate API Error**: Return "Orchestrate API failed - Check IBM configuration"
+- **Orchestrate API Error**: Return "Orchestrate API failed - Check IBM configuration" (Mencakup kegagalan koneksi ke endpoint Embed)
+- **AskOrchestrate Fail**: Return original data + "Ask Orchestrate failed to provide a useful answer." explanation
 - **Timeout**: Return "Process timed out. Try smaller image."
 - **Invalid Input**: Return "Invalid input format. Please check your data."
 - **Vision Fail**: Return original data + "Image unclear" explanation
