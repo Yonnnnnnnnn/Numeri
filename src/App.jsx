@@ -68,7 +68,7 @@ const FileSidebar = ({ files, activeFile, onSelectFile, onCreateFile, onUploadFi
 
 import JsonGridEditor from './components/JsonGridEditor';
 
-const ChatInterface = ({ messages, onSendMessage, isProcessing }) => {
+const ChatInterface = ({ messages, onSendMessage, isProcessing, aiMode, setAiMode }) => {
   const [input, setInput] = useState('');
   const [currentImage, setCurrentImage] = useState(null);
   const [hasImage, setHasImage] = useState(false);
@@ -111,12 +111,44 @@ const ChatInterface = ({ messages, onSendMessage, isProcessing }) => {
 
   return (
     <div className="w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full shadow-2xl z-10">
-      <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800">
-        <h3 className="font-semibold text-slate-200 flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
-          AI Architect Agent
-        </h3>
-        <Settings size={18} className="text-slate-500 cursor-pointer hover:text-cyan-400 transition-colors" />
+      <div className="p-4 border-b border-slate-800 bg-slate-800">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold text-slate-200 flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
+            AI Architect Agent
+          </h3>
+          <Settings size={18} className="text-slate-500 cursor-pointer hover:text-cyan-400 transition-colors" />
+        </div>
+        
+        {/* AI Mode Selector */}
+        <div className="text-xs text-slate-400 mb-2">AI Processing Mode:</div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setAiMode('gemini')}
+            className={`p-2 rounded border text-xs font-medium transition-all ${
+              aiMode === 'gemini'
+                ? 'bg-blue-600 border-blue-500 text-white'
+                : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
+            }`}
+          >
+            Gemini AI
+          </button>
+          <button
+            onClick={() => setAiMode('askOrchestrate')}
+            className={`p-2 rounded border text-xs font-medium transition-all ${
+              aiMode === 'askOrchestrate'
+                ? 'bg-purple-600 border-purple-500 text-white'
+                : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
+            }`}
+          >
+            AskOrchestrate
+          </button>
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Mode: <span className={`font-medium ${aiMode === 'askOrchestrate' ? 'text-purple-400' : 'text-blue-400'}`}>
+            {aiMode === 'askOrchestrate' ? 'IBM watsonx' : 'Gemini AI'}
+          </span>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/50">
@@ -236,6 +268,7 @@ export default function App() {
   const [fileHistory, setFileHistory] = useState({});
   const [showHistory, setShowHistory] = useState(false);
   const [filteredData, setFilteredData] = useState(null);
+  const [aiMode, setAiMode] = useState('gemini'); // 'gemini' or 'askOrchestrate'
 
   // Derived State
   const activeFile = files.find(f => f.name === activeFileName);
@@ -315,11 +348,18 @@ export default function App() {
       }
 
       // Call hybrid AI API
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add AskOrchestrate header if using that mode
+      if (aiMode === 'askOrchestrate') {
+        headers['X-Target-Agent'] = 'AskOrchestrate';
+      }
+
       const response = await fetch('/api/agent', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify({
           currentData: currentData,
           prompt: text,
@@ -719,6 +759,8 @@ export default function App() {
         messages={messages}
         onSendMessage={handleSendMessage}
         isProcessing={isProcessing}
+        aiMode={aiMode}
+        setAiMode={setAiMode}
       />
     </div>
   );
