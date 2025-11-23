@@ -33,9 +33,6 @@ Tugas: Ganti seluruh logika handler() (di dalam module.exports.handler = async (
 dengan kode sederhana ini untuk memverifikasi apakah Vercel dapat membaca ENV vars.
 */
 
-const ORCHESTRATE_API_KEY = process.env.ORCHESTRATE_API_KEY;
-const ORCHESTRATE_INVOKE_PATH = process.env.ORCHESTRATE_INVOKE_PATH;
-
 export default async function handler(req, res) {
     // === Logic Tes Sederhana: Hapus ini setelah debugging ===
     return res.status(200).json({
