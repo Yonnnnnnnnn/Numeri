@@ -227,12 +227,12 @@ async function handleADKAgentTask(requestBody) {
 
     // ADK Agent endpoint - correct format for ADK Agent API
     const possibleEndpoints = [
-      // Format 1: With instance and environment (most likely correct)
-      `https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`,
+      // Format 1: With instance and environment (working endpoint first)
       `https://us-south.watson-orchestrate.cloud.ibm.com/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`,
+      `https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`,
       // Format 2: Direct agent endpoint
-      `https://api.us-south.watson-orchestrate.cloud.ibm.com/agents/${agentId}/invoke`,
       `https://us-south.watson-orchestrate.cloud.ibm.com/agents/${agentId}/invoke`,
+      `https://api.us-south.watson-orchestrate.cloud.ibm.com/agents/${agentId}/invoke`,
     ];
 
     // Try different payload formats
@@ -292,9 +292,87 @@ async function handleADKAgentTask(requestBody) {
 
     console.log("📊 ADK Agent Response Status:", response.status);
 
-    // Parse response
-    const responseData = await response.json();
-    console.log("✅ ADK Agent Response:", JSON.stringify(responseData, null, 2));
+    // Get response as text first to handle both JSON and HTML
+    const responseText = await response.text();
+    console.log("📄 Raw ADK Agent Response (first 500 chars):", responseText.substring(0, 500));
+
+    let responseData;
+    try {
+      // Try to parse as JSON
+      responseData = JSON.parse(responseText);
+      console.log("✅ ADK Agent Response is JSON:", JSON.stringify(responseData, null, 2));
+    } catch (parseError) {
+      console.log("⚠️ ADK Agent Response is not JSON, likely HTML");
+      
+      // If HTML response, use Gemini to extract meaningful content
+      if (responseText.includes('<html') || responseText.includes('<!doctype') || responseText.includes('<!DOCTYPE')) {
+        console.log("🤖 Using Gemini to parse HTML response from ADK Agent");
+
+        try {
+          // Call Gemini to parse HTML and extract agent response
+          const geminiParsePrompt = `You are a helpful assistant that extracts chatbot responses from HTML pages.
+
+Below is an HTML response from IBM Watson Orchestrate ADK Agent. Please extract ONLY the actual agent response text (the chatbot's answer to the user's question).
+
+If there is NO actual agent response in the HTML (e.g., it's just a landing page or error page), respond with: "NO_RESPONSE_FOUND"
+
+HTML Content:
+${responseText.substring(0, 15000)}
+
+User's original question was: "${requestBody.prompt || 'test'}"
+
+Extract ONLY the agent's response, nothing else:`;
+
+          const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+          const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+
+          const geminiResult = await geminiModel.generateContent(geminiParsePrompt);
+          const geminiResponse = geminiResult.response.text();
+
+          console.log("📄 Gemini parsed ADK response:", geminiResponse);
+
+          if (geminiResponse.includes("NO_RESPONSE_FOUND")) {
+            return {
+              content: requestBody.currentData || [],
+              explanation: "⚠️ ADK Agent returned HTML without actual agent response. The endpoint might be for web widget only, not programmatic API.",
+              source: 'Numeri Financial Agent (ADK)',
+              isFilterView: false
+            };
+          } else {
+            return {
+              content: requestBody.currentData || [],
+              explanation: `✅ ADK Agent (via Gemini parser): ${geminiResponse}`,
+              source: 'Numeri Financial Agent (ADK)',
+              isFilterView: false
+            };
+          }
+        } catch (geminiError) {
+          console.error("❌ Gemini HTML parsing failed:", geminiError);
+          // Fallback to simple text extraction
+          const textContent = responseText
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          return {
+            content: requestBody.currentData || [],
+            explanation: `⚠️ ADK Agent returned HTML. Gemini parsing failed. Raw text: ${textContent.substring(0, 300)}`,
+            source: 'Numeri Financial Agent (ADK)',
+            isFilterView: false
+          };
+        }
+      } else {
+        // Not HTML, just plain text
+        return {
+          content: requestBody.currentData || [],
+          explanation: responseText.substring(0, 500),
+          source: 'Numeri Financial Agent (ADK)',
+          isFilterView: false
+        };
+      }
+    }
 
     // Extract agent response
     let agentExplanation = "No response from agent";
