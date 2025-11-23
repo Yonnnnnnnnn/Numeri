@@ -1,32 +1,29 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// IBM watsonx Orchestrate Configuration
+/**
+ * Vercel Serverless Function: Hybrid AI System (IBM watsonx Orchestrate + Google Gemini)
+ * 
+ * This function implements a 3-way routing architecture:
+ * - Vision Tasks (Image Processing): Google Gemini 2.5 Flash-Lite (Multimodal)
+ * - Cross-File Tasks (Multiple Datasets): IBM watsonx Orchestrate NumeriCrossFileAgent
+ * - Single Logic Tasks: Google Gemini 2.5 Flash-Lite
+ * 
+ * Environment Variables Required:
+ * - ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate instance URL
+ * - ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API Key (Bearer Token)
+ * - ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name
+ * - GEMINI_API_KEY: Google Gemini API key for text/logic tasks
+ */
+
+// AI IDE Prompt: Modifikasi Routing Logic di api/agent.js untuk Integrasi IBM watsonx Orchestrate
+
+// Tambahkan di awal file (atau di scope yang sesuai):
 const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL; 
 const ORCHESTRATE_API_KEY = process.env.ORCHESTRATE_API_KEY;
 const ORCHESTRATE_AGENT_NAME = process.env.ORCHESTRATE_AGENT_NAME;
 
-// Build full Orchestrate endpoint URL
+// Bangun URL endpoint Orchestrate penuh
 const ORCHESTRATE_ENDPOINT = `${ORCHESTRATE_BASE_URL}/agent/v1/invoke/${ORCHESTRATE_AGENT_NAME}`;
-
-/**
- * Vercel Serverless Function: Hybrid AI System (IBM Watsonx Orchestrate + Google Gemini)
- * 
- * This function implements a 3-way skill-routing architecture:
- * - Vision Tasks (Image Processing): Google Gemini 2.5 Flash-Lite (Multimodal)
- * - Cross-File Tasks (Multi-Data Analysis): IBM watsonx Orchestrate Agent
- * - Single Logic Tasks (JSON Processing): Google Gemini 2.5 Flash-Lite
- * 
- * Environment Variables Required:
- * - GEMINI_API_KEY: Google Gemini API key for text/logic tasks
- * - ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate base URL
- * - ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API key (Bearer Token)
- * - ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name
- * 
- * Example Vercel Environment Variables:
- * ORCHESTRATE_BASE_URL=https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/99a74687-1709-44f8-acd2-48b9fc95930c
- * ORCHESTRATE_API_KEY=ESRzgf0DpLSDvVioScg9eXgre-BkceDuddjfDiA0Nt48
- * ORCHESTRATE_AGENT_NAME=NumeriCrossFileAgent
- */
 
 export default async function handler(req, res) {
   // Only allow POST requests
@@ -68,47 +65,50 @@ STRICT INSTRUCTION:
 
     let result;
 
-    // Filter keys to count incoming datasets (excluding image and prompt)
+    // --- Modifikasi di dalam fungsi handler() ---
+
+    // Filter keys untuk menghitung jumlah dataset yang masuk (tidak termasuk image dan prompt)
     const dataKeys = Object.keys(req.body).filter(key => 
         key.toLowerCase().includes('data') && !key.toLowerCase().includes('base64')
     );
 
-    // 3-WAY SKILL ROUTING
     if (imageBase64) {
-      // Route 1: Vision Task (Original Logic)
-      console.log('Routing to Gemini 2.5 Flash-Lite for vision task...');
-      result = await handleVisionTask(currentData, imageBase64, processedPrompt);
-      
+        // Jalur 1: Vision Task (Logic Lama)
+        // Panggil Gemini Vision Agent
+        console.log('Routing to Gemini 2.5 Flash-Lite for vision task...');
+        result = await handleVisionTask(currentData, imageBase64, processedPrompt);
+        
     } else if (dataKeys.length >= 2) {
-      // Route 2: Cross-File Task -> IBM watsonx Orchestrate
-      
-      console.log(`Routing request to Orchestrate Agent: ${ORCHESTRATE_ENDPOINT}`);
+        // Jalur 2: Cross-File Task -> Panggil IBM watsonx Orchestrate
+        
+        console.log(`Routing request to Orchestrate Agent: ${ORCHESTRATE_ENDPOINT}`);
 
-      // Send entire request body (all data and prompt) to Orchestrate
-      const orchestrateResponse = await fetch(ORCHESTRATE_ENDPOINT, {
-          method: 'POST',
-          headers: {
-              // Use Orchestrate API Key as Bearer Token
-              'Authorization': `Bearer ${ORCHESTRATE_API_KEY}`,
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(req.body)
-      });
-      
-      if (!orchestrateResponse.ok) {
-          // Log detailed error
-          const errorText = await orchestrateResponse.text();
-          console.error('Orchestrate API Error:', orchestrateResponse.status, errorText);
-          throw new Error(`Orchestrate API failed with status ${orchestrateResponse.status}. Detail: ${errorText.substring(0, 100)}...`);
-      }
-      
-      // Assume: Orchestrate returns valid JSON
-      result = await orchestrateResponse.json();
+        // Kirim seluruh body request (semua data dan prompt) ke Orchestrate
+        const orchestrateResponse = await fetch(ORCHESTRATE_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                // Menggunakan API Key Orchestrate sebagai Bearer Token
+                'Authorization': `Bearer ${ORCHESTRATE_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(req.body)
+        });
+        
+        if (!orchestrateResponse.ok) {
+            // Log error rinci
+            const errorText = await orchestrateResponse.text();
+            console.error('Orchestrate API Error:', orchestrateResponse.status, errorText);
+            throw new Error(`Orchestrate API failed with status ${orchestrateResponse.status}. Detail: ${errorText.substring(0, 100)}...`);
+        }
+        
+        // Asumsi: Orchestrate mengembalikan JSON yang valid
+        result = await orchestrateResponse.json();
 
     } else {
-      // Route 3: Single Logic Task (Original Logic)
-      console.log('Routing to Gemini 2.5 Flash-Lite for single logic task...');
-      result = await handleLogicTask(currentData, processedPrompt);
+        // Jalur 3: Single Logic Task (Logic Lama)
+        // Panggil Gemini Logic Agent
+        console.log('Routing to Gemini 2.5 Flash-Lite for single logic task...');
+        result = await handleLogicTask(currentData, processedPrompt);
     }
 
     // Return parsed JSON response
