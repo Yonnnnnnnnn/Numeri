@@ -232,45 +232,57 @@ async function handleADKAgentTask(requestBody) {
       `${baseUrl}/agents/${agentName}/invoke`
     ];
 
-    const payload = {
-      message: fullMessage
-    };
+    // Try different payload formats
+    const payloadFormats = [
+      { message: fullMessage },
+      { messages: [{ role: "user", content: fullMessage }] },
+      { input: fullMessage },
+      { text: fullMessage },
+      { query: fullMessage }
+    ];
 
-    console.log("📤 Payload:", JSON.stringify(payload, null, 2));
+    console.log("📤 Trying multiple payload formats...");
 
     // Try each endpoint until one works
     let response = null;
     let workingEndpoint = null;
+    let workingPayload = null;
 
     for (const endpoint of possibleEndpoints) {
-      console.log("🎯 Trying endpoint:", endpoint);
-      
-      try {
-        const testResponse = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
+      for (const payload of payloadFormats) {
+        console.log("🎯 Trying endpoint:", endpoint, "with payload:", JSON.stringify(payload).substring(0, 50));
+        
+        try {
+          const testResponse = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
 
-        console.log("📊 Response Status:", testResponse.status);
+          console.log("📊 Response Status:", testResponse.status);
 
-        if (testResponse.status === 200 || testResponse.status === 201) {
-          response = testResponse;
-          workingEndpoint = endpoint;
-          console.log("✅ Working endpoint found:", workingEndpoint);
-          break;
-        } else {
-          const errorText = await testResponse.text();
-          console.log("⚠️ Endpoint failed:", errorText.substring(0, 200));
+          if (testResponse.status === 200 || testResponse.status === 201) {
+            response = testResponse;
+            workingEndpoint = endpoint;
+            workingPayload = payload;
+            console.log("✅ Working endpoint found:", workingEndpoint);
+            console.log("✅ Working payload format:", JSON.stringify(workingPayload).substring(0, 100));
+            break;
+          } else {
+            const errorText = await testResponse.text();
+            console.log("⚠️ Failed - Status:", testResponse.status);
+          }
+        } catch (error) {
+          console.log("⚠️ Endpoint error:", error.message);
+          continue;
         }
-      } catch (error) {
-        console.log("⚠️ Endpoint error:", error.message);
-        continue;
       }
+      
+      if (response) break; // Exit outer loop if we found a working endpoint
     }
 
     if (!response) {
