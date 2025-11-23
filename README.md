@@ -95,6 +95,40 @@ JSON Download
 
    The app will open at `http://localhost:3000`
 
+## 🌐 Vercel Deployment
+
+### Environment Variables Required
+
+Set these in your Vercel project settings:
+
+```bash
+# IBM watsonx Orchestrate Configuration
+ORCHESTRATE_BASE_URL=https://api.us-south.watson-orchestrate.cloud.ibm.com
+ORCHESTRATE_API_KEY=mvZYa2cToxl9jWb2BgfnoRNVOxqbBCFT89YeUoftmGWO
+ORCHESTRATE_AGENT_NAME=ce4cbf44-4736-4648-b6cf-5ed2c31791eb
+ORCHESTRATE_INVOKE_PATH=/orchestrate/api/v1/invoke/agents/
+
+# Google Gemini AI Configuration
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+### Deploy to Vercel
+
+1. **Push to GitHub** (already done):
+   ```bash
+   git push origin main
+   ```
+
+2. **Connect to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Add environment variables above
+   - Deploy
+
+3. **Test the deployment**:
+   - Visit your Vercel URL
+   - Test agent integration with prompts
+
 ### Build for Production
 
 ```bash
