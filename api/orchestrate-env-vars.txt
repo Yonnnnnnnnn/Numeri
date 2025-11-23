@@ -1,0 +1,18 @@
+# IBM watsonx Orchestrate Configuration
+# Base URL dari instance Orchestrate Anda (didapatkan dari JSON)
+ORCHESTRATE_BASE_URL="https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/99a74687-1709-44f8-acd2-48b9fc95930c"
+
+# API Key yang baru dibuat (digunakan sebagai Bearer Token)
+ORCHESTRATE_API_KEY="ApiKey-ecc04841-be00-42ff-8c23-971a10c0aeb1"
+
+# Nama Agent yang Anda buat (diperlukan untuk membangun URL endpoint penuh)
+ORCHESTRATE_AGENT_NAME="NumeriCrossFileAgent"
+
+# Ganti ORCHESTRATE_ENDPOINT dengan path ini (sesuai panduan hackathon)
+ORCHESTRATE_INVOKE_PATH="/orchestrate/api/v1/invoke/agents/"
+
+# Gemini AI Configuration (Existing)
+GEMINI_API_KEY="your-gemini-api-key-here"
+
+# Vercel Configuration
+VITE_VERCEL_PROXY_URL="https://numeri-dusky.vercel.app/api/agent"

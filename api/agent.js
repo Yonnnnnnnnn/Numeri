@@ -21,9 +21,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL; 
 const ORCHESTRATE_API_KEY = process.env.ORCHESTRATE_API_KEY;
 const ORCHESTRATE_AGENT_NAME = process.env.ORCHESTRATE_AGENT_NAME;
+const ORCHESTRATE_INVOKE_PATH = process.env.ORCHESTRATE_INVOKE_PATH || "/orchestrate/api/v1/invoke/agents/";
 
 // Bangun URL endpoint Orchestrate penuh
-const ORCHESTRATE_ENDPOINT = `${ORCHESTRATE_BASE_URL}/agent/v1/invoke/${ORCHESTRATE_AGENT_NAME}`;
+const ORCHESTRATE_ENDPOINT = `${ORCHESTRATE_BASE_URL}${ORCHESTRATE_INVOKE_PATH}${ORCHESTRATE_AGENT_NAME}`;
 
 export default async function handler(req, res) {
   // Only allow POST requests

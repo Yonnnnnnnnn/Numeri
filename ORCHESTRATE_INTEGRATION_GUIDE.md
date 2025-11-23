@@ -19,8 +19,9 @@ Modifikasi `api/agent.js` sekarang mendukung **3-way routing architecture**:
 ```bash
 # IBM watsonx Orchestrate Configuration
 ORCHESTRATE_BASE_URL=https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/99a74687-1709-44f8-acd2-48b9fc95930c
-ORCHESTRATE_API_KEY=ESRzgf0DpLSDvVioScg9eXgre-BkceDuddjfDiA0Nt48
+ORCHESTRATE_API_KEY=ApiKey-ecc04841-be00-42ff-8c23-971a10c0aeb1
 ORCHESTRATE_AGENT_NAME=NumeriCrossFileAgent
+ORCHESTRATE_INVOKE_PATH=/orchestrate/api/v1/invoke/agents/
 
 # Gemini Configuration (Existing)
 GEMINI_API_KEY=your-gemini-api-key-here
@@ -71,8 +72,8 @@ POST https://numeri-dusky.vercel.app/api/agent
 
 ### IBM watsonx Orchestrate (New Integration)
 ```
-POST https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/99a74687-1709-44f8-acd2-48b9fc95930c/agent/v1/invoke/NumeriCrossFileAgent
-Authorization: Bearer ESRzgf0DpLSDvVioScg9eXgre-BkceDuddjfDiA0Nt48
+POST https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/99a74687-1709-44f8-acd2-48b9fc95930c/orchestrate/api/v1/invoke/agents/NumeriCrossFileAgent
+Authorization: Bearer ApiKey-ecc04841-be00-42ff-8c23-971a10c0aeb1
 ```
 
 ## 🎯 Request Examples

@@ -1,0 +1,115 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Numeri Gemini Logic Agent",
+    "version": "1.0.0",
+    "description": "API untuk memproses logika akuntansi Double-Entry dan OCR menggunakan Gemini 2.5 Flash-Lite."
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "IBM watsonx Orchestrate API Key sebagai Bearer Token"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://numeri-dusky.vercel.app/api",
+      "description": "Vercel Proxy Numeri (Gemini AI)"
+    },
+    {
+      "url": "https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/99a74687-1709-44f8-acd2-48b9fc95930c",
+      "description": "IBM watsonx Orchestrate Instance"
+    }
+  ],
+  "paths": {
+    "/agent": {
+      "post": {
+        "operationId": "handleNumeriAgentLogic",
+        "summary": "Memproses Logic Task (JSON Update) atau Vision Task (OCR) Gemini.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "imageBase64": {
+                    "type": "string",
+                    "description": "Data gambar dalam format Base64 (Opsional: untuk Vision Task)."
+                  },
+                  "currentData": {
+                    "type": "array",
+                    "description": "Array JSON transaksi saat ini."
+                  },
+                  "budgetData": {
+                    "type": "array",
+                    "description": "Array JSON data anggaran (untuk Cross-File Analysis)."
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "description": "Instruksi pengguna atau query analisis."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Respons JSON yang terstruktur (filename, content, explanation)."
+          }
+        }
+      }
+    },
+    "/orchestrate/api/v1/invoke/agents/NumeriCrossFileAgent": {
+      "post": {
+        "operationId": "invokeOrchestrateAgent",
+        "summary": "Invoke IBM watsonx Orchestrate NumeriCrossFileAgent",
+        "description": "Memanggil agent IBM watsonx Orchestrate untuk cross-file analysis dan logic processing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "input": {
+                    "type": "object",
+                    "properties": {
+                      "currentData": {
+                        "type": "array",
+                        "description": "Array JSON transaksi saat ini."
+                      },
+                      "budgetData": {
+                        "type": "array", 
+                        "description": "Array JSON data anggaran untuk cross-file analysis."
+                      },
+                      "prompt": {
+                        "type": "string",
+                        "description": "Instruksi atau query untuk analisis cross-file."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response dari IBM watsonx Orchestrate agent dengan hasil analisis."
+          }
+        }
+      }
+    }
+  }
+}
