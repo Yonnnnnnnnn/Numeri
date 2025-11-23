@@ -1,0 +1,93 @@
+## 📄 PDF Content Summary
+
+[cite\_start]This document provides a guide for getting started with the IBM watsonx Orchestrate Agent Development Kit (ADK)[cite: 1, 2].
+
+### ADK Overview
+
+[cite\_start]The Agent Development Kit (ADK) offers a suite of developer-focused tools for building, testing, and managing agents in watsonx Orchestrate[cite: 5]. [cite\_start]It uses a lightweight framework and a simple CLI, giving developers full control over agent design[cite: 6]. [cite\_start]Agents can be defined using clear YAML or JSON files, and custom Python tools can be created[cite: 7]. [cite\_start]The ADK manages the entire agent lifecycle with minimal commands[cite: 7].
+
+### Before You Begin
+
+  * [cite\_start]**Required Software:** You need **Python 3.11 or later** installed on your system[cite: 12]. [cite\_start]You can check your current version by running `python --version` in a terminal[cite: 13, 14].
+  * [cite\_start]**watsonx Orchestrate Account:** The ADK must connect to an existing watsonx Orchestrate environment[cite: 24]. [cite\_start]You can sign up for a free 30-day trial if you don't have an account[cite: 25].
+
+### Setting Up and Installing the ADK
+
+1.  [cite\_start]**Installing the ADK:** Use `pip` to install the ADK with the following command[cite: 30, 32]:
+
+    ```bash
+    pip install --upgrade ibm-watsonx-orchestrate
+    ```
+
+    [cite\_start](Note: Using a virtual environment or a version manager like `uv` is optional but recommended for easier sharing and distribution [cite: 33, 34]).
+
+2.  [cite\_start]**Configure Your Environment:** Configure your watsonx Orchestrate environment using the `orchestrate env add` command[cite: 40, 41, 47]:
+
+    ```bash
+    orchestrate env add -n <environment-name> -u <service-url>
+    ```
+
+      * [cite\_start]You can choose any name for the environment[cite: 51].
+      * [cite\_start]In rare cases where the authentication type is not inferred, you must add the `--type` flag[cite: 52, 53, 54]:
+          * [cite\_start]**IBM Cloud:** `--type ibm_iam` [cite: 55]
+          * [cite\_start]**AWS:** `--type mcsp` [cite: 57]
+          * [cite\_start]**On-premises:** `--type cpd` [cite: 58]
+
+3.  [cite\_start]**Activate Your Environment:** Activate the newly configured environment with the command[cite: 59, 60, 61]:
+
+    ```bash
+    orchestrate env activate <environment-name>
+    ```
+
+    [cite\_start](You can also activate a local development environment provided by the watsonx Orchestrate Developer Edition, which runs under a Docker container [cite: 63]).
+
+### Creating Your First Agent (Hello World)
+
+[cite\_start]This is a test to verify your ADK setup by publishing a simple agent[cite: 66, 72].
+
+1.  [cite\_start]**Starting Your ADK Project:** Create a folder structure to store your agents, tools, and other resources[cite: 74, 75]:
+
+    ````bash
+    # Example for macOS & Linux
+    mkdir -p adk-project/{agents, tools, knowledge, flows}
+    # This creates the following structure:
+    # adk-project/
+    # ├── agents/
+    # ├── tools/
+    # ├── knowledge/
+    # └── flows/
+    [cite_start]``` [cite: 76, 79, 80, 81, 82, 84]
+
+    ````
+
+2.  [cite\_start]**Creating the Agent Specification:** Create a YAML file named `hello-world-agent.yaml` in the `agents` folder and add the agent's specification details (name, kind, instructions, LLM)[cite: 67, 68, 85, 86, 87, 89, 90, 91, 92, 93, 95].
+
+3.  [cite\_start]**Import the Agent:** Navigate to the folder containing the YAML file in your terminal and run the import command[cite: 96, 97, 98, 99]:
+
+    ```bash
+    orchestrate agents import -f hello-world-agent.yaml
+    ```
+
+    [cite\_start]A successful import shows the message: `[INFO] - Agent 'Hello World Agent' imported successfully`[cite: 101, 102].
+
+4.  **Open and Select the Agent:**
+
+      * [cite\_start]Log in to your watsonx Orchestrate instance and open the **Agent Builder** under the **Build** menu[cite: 103, 104, 109, 111].
+      * [cite\_start]Select the **Hello\_World\_Agent** on the **Build agents and tools** page[cite: 116, 117].
+
+5.  [cite\_start]**Test Your Agent:** Use the test chat feature on the agent's page to verify its functionality[cite: 121, 124, 125].
+
+### What's Next?
+
+[cite\_start]After creating your first agent, you can extend its capabilities[cite: 133, 134]:
+
+  * [cite\_start]**Tools:** Extend agent capabilities and integrate with external services[cite: 134, 143, 144].
+  * [cite\_start]**Knowledge Bases:** Provide more accurate responses and improve agent knowledge[cite: 134, 147, 148].
+  * [cite\_start]**Agentic Workflows:** Extend agent behavior[cite: 134].
+  * [cite\_start]**Connections:** Create connections to safely store credentials and sensitive data for connecting to services[cite: 135, 145, 146].
+  * [cite\_start]**Evaluation Framework:** Test and assess agent behavior by comparing simulated interactions with reference data[cite: 136, 149].
+  * [cite\_start]**Customization:** Change the agent's large language model and style by modifying the agent specification[cite: 136, 139].
+
+-----
+
+Would you like to explore more details about installing the ADK with a virtual environment or learn more about the folder structure for a project?

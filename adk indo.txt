@@ -1,0 +1,203 @@
+Tentu, berikut adalah konversi dari bagian PDF yang Anda berikan ke format teks:
+
+-----
+
+## 📚 IBM watsonx Orchestrate ADK
+
+### Get Started: Getting started with the ADK
+
+[cite\_start][cite: 1, 2, 3, 4]
+
+[cite\_start]The **Agent Development Kit (ADK)** gives you a set of developer-focused tools to build, test, and manage agents in watsonx Orchestrate[cite: 5]. [cite\_start]With the ADK, you take full control of agent design using a lightweight framework and a simple CLI[cite: 6]. [cite\_start]Define agents in clear **YAML or JSON files**, create custom **Python tools**, and manage the entire agent lifecycle with just a few commands[cite: 7].
+
+[cite\_start]This guide walks you through installing the ADK, setting up your local development environment, and deploying your first agent to a watsonx Orchestrate SaaS instance[cite: 8]. [cite\_start]Start building flexible, reusable AI agents right away[cite: 9].
+
+-----
+
+### Sebelum memulai
+
+#### Perangkat lunak yang diperlukan
+
+[cite\_start]Pastikan Anda telah menginstal **Python 3.11 atau yang lebih baru** di sistem Anda[cite: 11, 12]. Untuk memeriksa versi Python Anda saat ini, buka terminal dan jalankan:
+[cite\_start]`python --version` [cite: 13, 14]
+
+#### Akun watsonx Orchestrate
+
+  * [cite\_start]Untuk menggunakan ADK, Anda harus menghubungkannya ke **lingkungan watsonx Orchestrate** yang sudah ada[cite: 24].
+  * [cite\_start]Jika Anda tidak memiliki akun watsonx Orchestrate, Anda dapat mendaftar untuk uji coba gratis 30 hari[cite: 25].
+  * [cite\_start]Jika Anda sudah memiliki akun, Anda dapat menggunakan akun yang sudah ada untuk menyediakan lingkungan yang akan digunakan dengan ADK[cite: 26].
+
+-----
+
+### 🛠️ Menyiapkan dan menginstal ADK
+
+#### 1\. Menginstal ADK
+
+Gunakan perintah berikut untuk menginstal ADK dengan `pip`:
+
+```bash
+pip install upgrade ibm-watsonx-orchestrate
+```
+
+[cite\_start][cite: 29, 30, 31, 32]
+
+[cite\_start]Anda dapat memilih untuk menggunakan **virtual environment (venv)** atau pengelola versi seperti **uv** untuk mengontrol paket yang Anda instal[cite: 33]. [cite\_start]Penyiapan ini mempermudah berbagi dan mendistribusikan agen dan alat Anda kepada orang lain[cite: 34].
+
+Untuk mempelajari cara menginstal ADK dalam situasi ini, lihat langkah-langkah berikut:
+
+  * Pemasangan Sistem
+  * Lingkungan virtual
+  * [cite\_start]uv [cite: 35, 36]
+
+Instal ADK di sistem Anda dengan perintah berikut:
+[cite\_start]`pip install -upgrade ibm-watsonx-orchestrate` [cite: 37, 38]
+
+#### 2\. Mengkonfigurasi lingkungan Anda di ADK
+
+Konfigurasikan lingkungan watsonx Orchestrate Anda di ADK. [cite\_start]Gunakan lingkungan ini untuk membuat agen Anda[cite: 40, 41]. [cite\_start]Dalam langkah ini, Anda memerlukan akses ke kredensial tertentu untuk lingkungan Anda[cite: 42].
+
+[cite\_start]Jika Anda tidak mengetahui jenis lingkungan yang Anda miliki, lihat *Logging in to IBM watsonx Orchestrate*[cite: 43].
+
+  * [cite\_start]IBM Cloud [cite: 44]
+  * [cite\_start]AWS [cite: 45]
+  * [cite\_start]On-premises [cite: 46]
+
+[cite\_start]Untuk menambahkan lingkungan Anda, jalankan yang berikut[cite: 47]:
+
+```bash
+orchestrate env add -n <environment-name> -u <service-in:
+```
+
+[cite\_start][cite: 48, 49]
+
+> [cite\_start]**Catatan:** Anda dapat mengatur nama apa pun yang Anda sukai untuk lingkungan tersebut[cite: 50, 51].
+> Dalam kasus yang jarang terjadi ketika watsonx Orchestrate ADK tidak secara otomatis menyimpulkan jenis otentikasi yang benar untuk URL Anda, tambahkan yang berikut ke perintah `orchestrate env add`:
+> [cite\_start]\* **IBM Cloud:** `--type ibm_iam` [cite: 52, 53, 54, 55, 56]
+> [cite\_start]\* **AWS:** `--type mcsp` [cite: 57]
+> [cite\_start]\* **On-premises:** `--type cpd` [cite: 58]
+
+#### 3\. Mengaktifkan lingkungan Anda
+
+[cite\_start]Jalankan perintah berikut untuk mengaktifkan lingkungan yang Anda buat[cite: 59, 60]:
+[cite\_start]`orchestrate env activate <environment-name>` [cite: 61]
+
+[cite\_start]Jika Anda perlu mengubah lingkungan, lihat *Configuring your environments*[cite: 62].
+
+> **Catatan:** Anda juga dapat mengaktifkan lingkungan pengembangan lokal. [cite\_start]Lingkungan ini disediakan oleh **watsonx Orchestrate Developer Edition**, versi watsonx Orchestrate yang lebih sederhana yang berjalan di bawah kontainer Docker untuk digunakan sebagai server pengembangan[cite: 63].
+> [cite\_start]Untuk mempelajari lebih lanjut tentangnya, lihat *watsonx Orchestrate Developer Edition*[cite: 64].
+
+-----
+
+### 🧑‍💻 Membuat agen pertama Anda
+
+[cite\_start]Dengan ADK Anda terhubung ke instance watsonx Orchestrate Anda, Anda siap untuk menguji penyiapan Anda dengan menerbitkan agen sederhana[cite: 65, 66].
+
+[cite\_start]Di watsonx Orchestrate, Anda mendefinisikan agen menggunakan file **YAML atau JSON**[cite: 67]. [cite\_start]File spesifikasi agen mencakup detail kunci seperti nama agen, jenis, instruksi untuk LLM, dan alat yang dapat digunakannya[cite: 68]. [cite\_start]Ketika Anda membangun agen dengan ADK, Anda menulis spesifikasi ini sendiri, yang memberi Anda kontrol penuh atas perilaku dan kemampuan agen Anda[cite: 69, 70]. [cite\_start]Anda dapat membuat agen canggih dengan alat kustom, kolaborator, atau integrasi[cite: 71].
+
+[cite\_start]Untuk saat ini, mulailah dengan agen Hello World minimal untuk memverifikasi penyiapan Anda[cite: 72].
+
+#### 1\. Memulai proyek ADK Anda
+
+[cite\_start]Sebagai proyek Python, merupakan praktik yang baik untuk membuat folder yang menyimpan agen, alat, dan sumber daya Anda lainnya[cite: 74, 75].
+
+**Contoh struktur folder:**
+
+```
+adk-project/
+    agents/
+    tools/
+    knowledge/
+    flows/
+```
+
+[cite\_start][cite: 77, 79, 80, 81, 82]
+
+Gunakan perintah berikut untuk membuat struktur folder (contoh untuk macOS & Linux):
+[cite\_start]`mkdir -p adk-project/{agents, tools, knowledge, flows}` [cite: 83, 84]
+
+#### 2\. Membuat spesifikasi agen
+
+[cite\_start]Mulailah dengan membuat file YAML untuk agen dan beri nama file tersebut sebagai `hello-world-agent.yaml`[cite: 85, 86].
+
+[cite\_start]Buka file yang dibuat dengan editor teks pilihan Anda, lalu salin dan tempelkan kode berikut[cite: 87, 88]:
+
+```yaml
+spec_version: v1
+kind: native
+name: Hello_World_Agent
+description: A simple Hello World agent
+instructions: "You are a test agent created for a tutorial οι
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+```
+
+[cite\_start][cite: 89, 90, 91, 92, 93, 94]
+
+[cite\_start]Dan simpan file tersebut di folder `agents`[cite: 95].
+
+#### 3\. Mengimpor agen
+
+[cite\_start]Buka terminal Anda dan navigasikan ke folder tempat Anda membuat file YAML[cite: 96, 97]. [cite\_start]Kemudian jalankan perintah berikut untuk menerbitkan agen Anda[cite: 98]:
+[cite\_start]`orchestrate agents import -f hello-world-agent.yaml` [cite: 99]
+
+[cite\_start]Jika impor berhasil, Anda akan mendapatkan pesan konfirmasi berikut[cite: 101, 102]:
+[cite\_start]`[INFO] - Agent 'Hello World Agent' imported successfully` [cite: 102]
+
+#### 4\. Membuka Agent Builder
+
+[cite\_start]Masuk ke instance watsonx Orchestrate Anda dan buka **Agent Builder**[cite: 103, 104, 105, 106, 107, 108, 109, 110, 111, 112].
+
+#### 5\. Memilih agen Hello World
+
+[cite\_start]Pada halaman *Build agents and tools*, pilih `Hello_World_Agent`[cite: 116, 117, 118].
+
+#### 6\. Menguji agen Anda
+
+[cite\_start]Di halaman ini, Anda dapat menyesuaikan perilaku agen Anda[cite: 124]. [cite\_start]Gunakan **test chat** untuk menguji agen Anda[cite: 125].
+
+-----
+
+### 🚀 Apa selanjutnya?
+
+[cite\_start]Anda sekarang telah membuat agen pertama Anda dengan ADK dan berhasil mengimpornya ke instance watsonx Orchestrate Anda[cite: 133].
+
+Untuk memperluas perilaku agen Anda, Anda dapat menggunakan:
+
+  * **Tools**
+  * **Knowledge bases**
+  * [cite\_start]**Agentic workflows** [cite: 134]
+
+[cite\_start]Untuk terhubung ke layanan, Anda harus membuat **Connections** untuk menyimpan kredensial dan data sensitif dengan aman[cite: 135].
+
+Anda juga dapat:
+
+  * [cite\_start]Mengubah **model bahasa besar** (Large Language Model/LLM) dan **gaya** agen dengan mengubah spesifikasi agen[cite: 136, 139].
+  * [cite\_start]Menguji dan mengevaluasi agen dengan **Evaluation Framework**[cite: 136].
+
+[cite\_start]Lihat kartu berikut untuk mempelajari lebih lanjut tentang apa yang dapat Anda lakukan dengan ADK[cite: 137]:
+
+| Area | Yang Dapat Anda Lakukan |
+| :--- | :--- |
+| **Agents** | [cite\_start]Pelajari lebih lanjut tentang agen, cara mengubah gaya agen, dan cara menyesuaikan model bahasa besar agen[cite: 138, 139]. |
+| **Environments** | [cite\_start]Pelajari cara mengubah lingkungan watsonx Orchestrate Anda untuk mengimpor agen yang dikembangkan dengan ADK[cite: 140, 141, 142]. |
+| **Tools** | [cite\_start]Pelajari lebih lanjut tentang cara menggunakan tools untuk memperluas kemampuan agen Anda dan cara berintegrasi dengan layanan eksternal[cite: 143, 144]. |
+| **Connections** | [cite\_start]Pelajari lebih lanjut tentang cara menyimpan kredensial dengan aman dan terhubung ke layanan eksternal[cite: 145, 146]. |
+| **Knowledge Base** | [cite\_start]Pelajari cara menggunakan basis pengetahuan untuk memberikan respons yang lebih akurat dan meningkatkan pengetahuan agen Anda dalam situasi tertentu[cite: 147, 148]. |
+| **Evaluation Framework** | [cite\_start]Menilai perilaku agen Anda dengan membandingkan interaksi agen yang disimulasikan dengan sekumpulan data referensi yang telah ditentukan sebelumnya[cite: 149]. |
+
+[cite\_start][cite: 150, 151, 152]
+
+#### Informasi Hak Cipta
+
+[cite\_start]Copyright IBM Corporation 2025 [cite: 153, 154]
+
+#### Privasi dan Aksesibilitas
+
+  * [cite\_start]Privasi [cite: 155, 156]
+  * [cite\_start]Aksesibilitas [cite: 157]
+  * [cite\_start]Ketentuan penggunaan [cite: 158]
+
+-----
+
+> **Mengenai cookie:**
+> Situs web IBM memerlukan beberapa cookie agar berfungsi dengan baik (wajib). Selain itu, cookie lain dapat digunakan dengan persetujuan Anda untuk menganalisis penggunaan situs, meningkatkan pengalaman pengguna, dan untuk iklan. Untuk tujuan ini, IBM dapat membagikan informasi pribadi yang dikumpulkan melalui cookie dengan anak perusahaan IBM dan pihak ketiga secara global. [cite\_start]Anda dapat memilih **Accept all** atau **Required only**[cite: 15, 16, 17, 18, 19].

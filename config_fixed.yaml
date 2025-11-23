@@ -1,0 +1,18 @@
+cached_user_env: {}
+context:
+  active_environment: numeri-env
+environments:
+  ibm-cloud:
+    api_key: mvZYa2cToxl9jWb2BgfnoRNVOxqbBCFT89YeUoftmGWO
+    auth_type: ibm_iam
+    wxo_url: https://api.us-south.watson-orchestrate.cloud.ibm.com
+  local:
+    wxo_url: http://localhost:4321
+  numeri-env:
+    api_key: mvZYa2cToxl9jWb2BgfnoRNVOxqbBCFT89YeUoftmGWO
+    auth_type: ibm_iam
+    wxo_url: https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/99a74687-1709-44f8-acd2-48b9fc95930c
+python_registry:
+  skip_version_check: false
+  test_package_version_override: null
+  type: pypi

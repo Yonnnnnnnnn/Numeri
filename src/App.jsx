@@ -119,34 +119,32 @@ const ChatInterface = ({ messages, onSendMessage, isProcessing, aiMode, setAiMod
           </h3>
           <Settings size={18} className="text-slate-500 cursor-pointer hover:text-cyan-400 transition-colors" />
         </div>
-        
+
         {/* AI Mode Selector */}
         <div className="text-xs text-slate-400 mb-2">AI Processing Mode:</div>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setAiMode('gemini')}
-            className={`p-2 rounded border text-xs font-medium transition-all ${
-              aiMode === 'gemini'
+            className={`p-2 rounded border text-xs font-medium transition-all ${aiMode === 'gemini'
                 ? 'bg-blue-600 border-blue-500 text-white'
                 : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
-            }`}
+              }`}
           >
             Gemini AI
           </button>
           <button
             onClick={() => setAiMode('askOrchestrate')}
-            className={`p-2 rounded border text-xs font-medium transition-all ${
-              aiMode === 'askOrchestrate'
+            className={`p-2 rounded border text-xs font-medium transition-all ${aiMode === 'askOrchestrate'
                 ? 'bg-purple-600 border-purple-500 text-white'
                 : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
-            }`}
+              }`}
           >
-            AskOrchestrate
+            Numeri Financial Agent
           </button>
         </div>
         <div className="mt-1 text-xs text-slate-500">
           Mode: <span className={`font-medium ${aiMode === 'askOrchestrate' ? 'text-purple-400' : 'text-blue-400'}`}>
-            {aiMode === 'askOrchestrate' ? 'IBM watsonx' : 'Gemini AI'}
+            {aiMode === 'askOrchestrate' ? 'Watson ADK Agent' : 'Gemini AI'}
           </span>
         </div>
       </div>
@@ -207,7 +205,7 @@ const ChatInterface = ({ messages, onSendMessage, isProcessing, aiMode, setAiMod
             <Send size={16} />
           </button>
         </div>
-        
+
         {/* Show image preview */}
         {hasImage && currentImage && (
           <div className="mt-2 p-2 bg-slate-700 rounded-lg border border-slate-600">
@@ -227,7 +225,7 @@ const ChatInterface = ({ messages, onSendMessage, isProcessing, aiMode, setAiMod
             </div>
           </div>
         )}
-        
+
         <div className="mt-2 flex justify-between items-center text-xs text-slate-500">
           <span className="flex items-center gap-1 cursor-default">
             <ImageIcon size={12} className='text-cyan-400' /> Multimodal Input Ready (Ctrl+V or Upload)
@@ -606,17 +604,17 @@ export default function App() {
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        
+
         // Calculate new dimensions
         let { width, height } = img;
         if (width > maxWidth) {
           height = (height * maxWidth) / width;
           width = maxWidth;
         }
-        
+
         canvas.width = width;
         canvas.height = height;
-        
+
         // Draw and compress
         ctx.drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL('image/jpeg', quality));
@@ -636,10 +634,10 @@ export default function App() {
           const reader = new FileReader();
           reader.onload = async (event) => {
             const base64Image = event.target.result;
-            
+
             // Compress image to reduce token usage
             const compressedImage = await compressImage(base64Image);
-            
+
             // Add user message with image
             setMessages(prev => [...prev, {
               role: 'user',
