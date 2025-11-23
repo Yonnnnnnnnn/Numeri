@@ -307,25 +307,58 @@ async function handleOrchestrateTask(requestBody) {
         orchestrateExplanation = JSON.stringify(data);
       }
     } catch (parseError) {
-      console.log("⚠️ Response is not JSON, treating as text/HTML");
+      console.log("⚠️ Response is not JSON, trying Gemini HTML parser...");
 
-      // If still HTML, extract text from it
+      // If HTML response, use Gemini to extract meaningful content
       if (responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
-        // Simple HTML text extraction
-        const textContent = responseText
-          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        console.log("🤖 Using Gemini to parse HTML response from Watson Orchestrate");
 
-        orchestrateExplanation = `⚠️ Watson Orchestrate mengembalikan HTML (bukan JSON). Extracted text: ${textContent.substring(0, 500)}`;
+        try {
+          // Call Gemini to parse HTML and extract agent response
+          const geminiParsePrompt = `You are a helpful assistant that extracts chatbot responses from HTML pages.
+
+Below is an HTML response from IBM Watson Orchestrate. Please extract ONLY the actual agent response text (the chatbot's answer to the user's question).
+
+If there is NO actual agent response in the HTML (e.g., it's just a landing page or error page), respond with: "NO_RESPONSE_FOUND"
+
+HTML Content:
+${responseText.substring(0, 15000)}
+
+User's original question was: "${requestBody.prompt || 'unknown'}"
+
+Extract ONLY the agent's response, nothing else:`;
+
+          const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+          const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+
+          const geminiResult = await geminiModel.generateContent(geminiParsePrompt);
+          const geminiResponse = geminiResult.response.text();
+
+          console.log("📄 Gemini parsed response:", geminiResponse);
+
+          if (geminiResponse.includes("NO_RESPONSE_FOUND")) {
+            orchestrateExplanation = "⚠️ Watson Orchestrate returned HTML without actual agent response. The endpoint might be for web widget only, not programmatic API.";
+          } else {
+            orchestrateExplanation = `✅ Watson Orchestrate (via Gemini parser): ${geminiResponse}`;
+          }
+        } catch (geminiError) {
+          console.error("❌ Gemini HTML parsing failed:", geminiError);
+          // Fallback to simple text extraction
+          const textContent = responseText
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          orchestrateExplanation = `⚠️ Watson Orchestrate returned HTML. Gemini parsing failed. Raw text: ${textContent.substring(0, 300)}`;
+        }
       } else {
         orchestrateExplanation = responseText;
       }
     }
 
-    console.log("✅ Extracted explanation:", orchestrateExplanation);
+    console.log("✅ Final explanation:", orchestrateExplanation);
 
     // Return in Numeri format
     return {
