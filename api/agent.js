@@ -205,7 +205,7 @@ async function handleADKAgentTask(requestBody) {
     // Get API Key for authentication
     const apiKey = process.env.ORCHESTRATE_API_KEY;
     const agentName = process.env.ORCHESTRATE_AGENT_NAME; // This is the Agent ID: ce4cbf44-4736-4648-b6cf-5ed2c31791eb
-    const baseUrl = process.env.ORCHESTRATE_BASE_URL || "https://api.us-south.watson-orchestrate.cloud.ibm.com";
+    const baseUrl = "https://api.us-south.watson-orchestrate.cloud.ibm.com"; // Clean base URL without instance path
 
     console.log("🔑 Using API Key for authentication");
     console.log("🎯 Agent ID:", agentName);
@@ -227,7 +227,9 @@ async function handleADKAgentTask(requestBody) {
       `${baseUrl}/v1/agents/${agentName}/chat`,
       `${baseUrl}/v1/agents/${agentName}/invoke`,
       `${baseUrl}/instances/${process.env.ORCHESTRATE_INSTANCE_ID}/agents/${agentName}/environments/${process.env.ORCHESTRATE_AGENT_ENVIRONMENT_ID}/invoke`,
-      `${baseUrl}/api/v1/agents/${agentName}/chat`
+      `${baseUrl}/api/v1/agents/${agentName}/chat`,
+      `${baseUrl}/agents/${agentName}/chat`,
+      `${baseUrl}/agents/${agentName}/invoke`
     ];
 
     const payload = {
