@@ -1,6 +1,6 @@
-* Request diteruskan ke IBM watsonx Orchestrate.
-   * Agent Numeri mengekstrak data dari gambar menggunakan Llama 3.2 Vision.
-   * Agent menggabungkan data baru ke dalam array JSON yang ada.
+* Request diteruskan ke Gemini AI System.
+   * Agent Numeri mengekstrak data dari gambar menggunakan Gemini 2.5 Flash-Lite (Multimodal).
+   * Agent menggabungkan data baru ke dalam array JSON yang ada dengan validasi akuntansi double-entry.
 4. Review: Hasil JSON baru ditampilkan di Grid Editor. User bisa melihat baris baru yang ditambahkan AI.
 5. Download: User mengklik tombol "Download JSON" untuk menyimpan file numeri_transactions_20251123.json ke komputer.
 4. Functional Requirements
@@ -8,11 +8,11 @@ ID
 	Requirement
 	Deskripsi Teknis
 	FR-01
-	IBM Agent Config
-	Agent watsonx dikonfigurasi untuk menerima input teks/gambar dan SELALU mengembalikan full JSON object.
+	Gemini AI Agent Config
+	Agent Gemini 2.5 Flash-Lite dikonfigurasi untuk menerima input teks/gambar dan SELALU mengembalikan full JSON object.
 	FR-02
 	Secure Proxy
-	Middleware Vercel (/api/agent) menangani rotasi token IAM IBM dan menyembunyikan API Key.
+	Middleware Vercel (/api/agent) menangani API Key Google Gemini dan menyembunyikan credential.
 	FR-03
 	Vision Handling
 	Konversi gambar upload ke Base64 di client-side sebelum dikirim ke API.
@@ -28,25 +28,40 @@ ID
 	FR-07
 	Stateless Processing
 	Server tidak boleh menyimpan file user. Data hanya hidup selama sesi browser aktif.
-	5. Konfigurasi Agent (IBM watsonx Orchestrate)
+5. Konfigurasi Agent (Gemini AI System)
 Konfigurasi ini memastikan AI mengembalikan file utuh, meminimalisir logika rumit di frontend.
-* Name: Numeri Architect
-* Model: Llama 3.5 Turbo Vision (Multimodal).
+
+## 5.1 Vision Agent (Gemini 2.5 Flash-Lite)
+* Name: Numeri Vision Agent
+* Model: Gemini 2.5 Flash-Lite (Multimodal)
+* Role: Receipt OCR dan Data Extraction
+* Instructions:
+Extract receipt data (Date, Merchant, Amount, Items) into strict JSON format. Generate UUID and append to existing array.
+
+## 5.2 Logic Agent (Gemini 2.5 Flash-Lite)
+* Name: Numeri Logic Agent
+* Model: Gemini 2.5 Flash-Lite
+* Role: JSON Manipulation dan Accounting Logic
 * Instructions (System Prompt):
-You are Numeri, an expert Data Architect Agent running on IBM watsonx.
-YOUR GOAL:
-Receive an existing JSON dataset (or empty list) and a User Input (Text command or Image).
-Return the COMPLETE, UPDATED JSON dataset.
-STRICT DATA SCHEMAS:
-1. Transactions: { "id": "uuid", "date": "YYYY-MM-DD", "description": "string", "amount": number, "category": "string", "type": "income|expense" }
-OUTPUT RULES:
-1. You must ONLY respond with the FINAL VALID JSON.
-2. DO NOT return a "patch" or "diff". Return the FULL file content.
-3. DO NOT include markdown formatting (no triple backticks).
-4. DO NOT include conversational filler like "Here is the updated file".
-5. Structure: { "filename": "transactions.json", "content": [ ...all rows... ], "explanation": "Added 1 receipt from image." }
-VISION TASKS:
-If an image is provided, extract the Date, Total Amount, and Merchant Name (Description). Map it to the Schema. Generate a UUID. Append this new object to the existing array.
+You are Numeri, an Expert AI Accountant.
+
+Rules:
+1. **Double-Entry:** Translate user intent into strict Journal Entries (Debit/Credit).
+2. **Structure:** If user asks to change columns, restructure the JSON schema.
+3. **Math:** Calculate balances accurately.
+4. **Output:** Return ONLY the valid updated JSON dataset matching the schema.
+
+CURRENT JSON DATASET:
+{DYNAMIC_DATA_INJECTION}
+
+User Command: {USER_PROMPT}
+
+Return ONLY this JSON structure (no markdown, no explanations outside JSON):
+{
+  "filename": "transactions_updated.json",
+  "content": [array of updated rows],
+  "explanation": "Penjelasan perubahan dalam Bahasa Indonesia"
+}
 6. Data Architecture (In-Memory Schemas)
 Struktur data yang diharapkan dari upload user dan output AI.
 A. transactions.json
@@ -83,9 +98,9 @@ graph LR
         Proxy[Serverless Function]
     end
     
-    subgraph IBM [IBM Cloud]
-        Agent[watsonx Agent]
-        Llama[Llama 3.2 Vision]
+    subgraph Google [Google Cloud]
+        Agent[Gemini AI]
+        Gemini[Gemini 2.5 Flash-Lite]
     end
 
 
@@ -94,8 +109,8 @@ graph LR
     User --3. Trigger AI (Prompt/Image)--> Browser
     Browser --4. JSON + Image (Base64)--> Proxy
     Proxy --5. Secure Request--> Agent
-    Agent --6. Inference--> Llama
-    Llama --7. Full JSON Result--> Agent
+    Agent --6. Inference--> Gemini
+    Gemini --7. Full JSON Result--> Agent
     Agent --8. Response--> Proxy
     Proxy --9. Update State--> Browser
     Browser --10. Render Grid--> User
@@ -112,7 +127,7 @@ Security
 * Input Validation: Vercel Proxy membatasi ukuran payload maksimal 4.5MB (batas Serverless Function) untuk mencegah abuse.
 Performance
 * Client-Side Speed: Parsing JSON dan rendering tabel dilakukan di browser (main thread), sangat cepat untuk file < 1MB.
-* Optimistic Updates: UI menampilkan loading spinner "Analyzing Document..." saat menunggu respons IBM.
+* Optimistic Updates: UI menampilkan loading spinner "Analyzing Document..." saat menunggu respons Gemini.
 Error Handling
 Error Case
 	System Behavior
@@ -122,8 +137,8 @@ Error Case
 	Jika gambar buram, Agent mengembalikan JSON lama tanpa perubahan + explanation: "Image unclear". UI menampilkan pesan toast warning.
 	Empty Input
 	Jika user menekan "Process" tanpa upload apapun, kirim array kosong [] ke AI sebagai start awal.
-	IBM Timeout
-	Jika watsonx memakan waktu > 30 detik (limit Vercel Pro Plan), tampilkan: "Process timed out. Try smaller image."
+	Gemini Timeout
+	Jika Gemini memakan waktu > 30 detik (limit Vercel Pro Plan), tampilkan: "Process timed out. Try smaller image."
 	10. Acceptance Criteria & Success Metrics
 Acceptance Criteria (MVP)
 1. File Upload: Sistem menerima upload transactions.json valid dan menampilkannya di tabel.
@@ -136,110 +151,40 @@ Success Metrics
 2. Accuracy: 3 dari 3 percobaan upload struk menghasilkan angka amount yang tepat.
 
 
-11. API Contract – IBM Watsonx Orchestrate Integration
-This section defines the mandatory contract between the Vercel Serverless Proxy and the IBM watsonx Orchestrate Agent deployment. The Vercel function is responsible for pre-processing, authentication (IAM Token management), and post-processing the final response.
-11.1 Endpoint and Authentication
-The Vercel Proxy must target the general Watsonx API endpoint for model/agent inference.
-Component
-	Specification
-	Notes
-	Method
-	POST
-	
+11. API Contract – Gemini AI Integration
+This section defines the mandatory contract between the Vercel Serverless Proxy and the Google Gemini AI deployment. The Vercel function is responsible for pre-processing, authentication (API Key management), and post-processing the final response.
 
-	Endpoint URL
-	https://{region}.{watsonx_host}/v2/text/generate
-	Exact host and region determined by IBM Cloud setup (e.g., us-south).
-	Header: Authorization
-	Bearer {IAM_TOKEN}
-	Token generated by the Vercel Proxy using IBM_CLOUD_API_KEY.
-	Header: Content-Type
-	application/json
-	
+## 11.1 Environment Variables Required
+- GEMINI_API_KEY: Google Gemini API key for authentication
+- No additional authentication tokens required (simpler than IBM IAM)
 
-	Header: IBM-Project-Id
-	{IBM_PROJECT_ID}
-	Required for billing and resource isolation. Stored as Vercel Env Var.
-	11.2 Request Payload Structure
-The payload must be constructed to include the full context required by the Numeri Architect Agent: the user's prompt, the full dataset content, and any visual input.
-A. Text-Only Task (e.g., "Change category to 'Office'")
+## 11.2 Agent Routing Logic
+The Vercel Proxy implements intelligent routing based on input type:
+
+### Vision Tasks (Image Processing)
+- **Trigger**: imageBase64 present in request
+- **Model**: gemini-2.5-flash-lite (multimodal)
+- **Function**: handleVisionTask()
+- **Process**: Extract receipt data → Generate UUID → Append to JSON array
+
+### Logic Tasks (Text Processing)
+- **Trigger**: text prompt only (no image)
+- **Model**: gemini-2.5-flash-lite
+- **Function**: handleLogicTask()
+- **Process**: Apply accounting rules → Update JSON schema → Return full dataset
+
+## 11.3 Response Format
+Both agents return consistent JSON structure:
+```javascript
 {
-  "model_id": "ibm/granite-3.0-8b-instruct", 
-  "input": "Current JSON Dataset:\n\n{FULL JSON CONTENT UPLOADED BY USER}\n\nUser Command: {TEXT PROMPT FROM USER}",
-  "parameters": {
-    "decoding_method": "greedy",
-    "max_new_tokens": 8192,
-    "min_new_tokens": 10,
-    "stop_sequences": ["]", "}"],
-    "temperature": 0.1
-  }
+  "filename": "transactions_updated.json",
+  "content": [updated_transactions_array],
+  "explanation": "Penjelasan perubahan dalam Bahasa Indonesia"
 }
+```
 
-
-B. Vision and Mixed Tasks (e.g., "Add this receipt")
-For multimodal tasks, the input string must be preceded by the Base64 representation of the image. The model ID must be updated to support vision (e.g., Llama 3.2).
-{
-  "model_id": "ibm/llama-3.5-turbo-vision-001",
-  "input": "data:image/jpeg;base64,{BASE64_IMAGE_STRING}\n\nCurrent JSON Dataset:\n\n{FULL JSON CONTENT UPLOADED BY USER}\n\nUser Command: {TEXT PROMPT OR INSTRUCTION}",
-  "parameters": {
-    "decoding_method": "sampling",
-    "max_new_tokens": 8192,
-    "min_new_tokens": 10,
-    "temperature": 0.5 
-  }
-}
-
-
-C. Full Example Payload (Simplified)
-This example shows the payload for a text-only modification request.
-{
-  "model_id": "ibm/granite-3.0-8b-instruct",
-  "input": "Current JSON Dataset:\n\n[\n  {\"id\": \"1\", \"description\": \"Old item\", \"amount\": 100}\n]\n\nUser Command: Create a new item with description 'New Server' and amount 500.",
-  "parameters": {
-    "decoding_method": "greedy",
-    "max_new_tokens": 8192,
-    "min_new_tokens": 10,
-    "temperature": 0.1
-  }
-}
-
-
-11.3 Response Contract and Post-Processing
-The API returns a JSON object containing an array of predictions. The Vercel Proxy must extract the plain text content from the first prediction and process it.
-Expected Successful Response Structure
-{
-  "model_id": "ibm/granite-3.0-8b-instruct",
-  "created_at": "2025-11-22T08:00:00.000Z",
-  "results": [
-    {
-      "generated_text": "{JSON_OUTPUT_AS_PER_AGENT_INSTRUCTIONS}",
-      "input_token_count": 500,
-      "generated_token_count": 80
-    }
-  ]
-}
-
-
-Required Post-Processing by Vercel Proxy
-1. Extraction: Extract the content of results[0].generated_text.
-2. Schema Check: The extracted text must be parsed using JSON.parse().
-3. Client Response: Vercel Proxy returns the parsed JSON object directly to the client (PWA).
-11.4 Constraints and Error Handling
-Constraint/Limitation
-	Specification
-	Impact on Vercel Proxy
-	Max Token Output
-	Recommended 8192 tokens.
-	Limits the size of the returned JSON dataset. Numeri should warn user if upload exceeds what can be processed.
-	Vercel Payload Limit
-	~4.5 MB (for Serverless Function body).
-	All Base64 images + JSON context must be under this limit. This is the ultimate file size constraint for uploads.
-	Model Failure (Error)
-	IBM returns HTTP 400 or 500 status code with detailed error object.
-	Proxy must catch non-200 status codes. Forward generic error message to client: "Error processing request on IBM watsonx. Please try again."
-	Timeout
-	Vercel Function timeout is 30s. (Vercel Pro Plan)
-	Vision tasks must complete inference within this window. Proxy should implement a simple retry mechanism or fail gracefully.
-	Input Token Count
-	Max tokens limit depends on the specific model (e.g., Granite 3.0).
-	Proxy must calculate the approximate token count of the input (user prompt + full JSON file) and refuse large uploads proactively if it exceeds model context window.
+## 11.4 Error Handling
+- **API Key Error**: Return "Gemini API unavailable - Check configuration"
+- **Timeout**: Return "Process timed out. Try smaller image."
+- **Invalid Input**: Return "Invalid input format. Please check your data."
+- **Vision Fail**: Return original data + "Image unclear" explanation
