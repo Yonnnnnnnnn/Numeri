@@ -80,10 +80,10 @@ STRICT INSTRUCTION:
       key.toLowerCase().includes('data') && !key.toLowerCase().includes('base64')
     );
 
-    // Priority 1: ADK Agent Tasks (Explicit Target via Header)
+    // Priority 1: Financial Agent Tasks (Explicit Target via Header)
     if (req.headers['x-target-agent'] === 'NumeriFinancialAgent') {
-      console.log('Routing to IBM watsonx Orchestrate ADK Agent (NumeriFinancialAgent)...');
-      result = await handleADKAgentTask(req.body);
+      console.log('Routing to IBM watsonx Orchestrate Financial Agent...');
+      result = await handleOrchestrateTask(req.body);
 
     }
     // Priority 2: Cross-File Tasks (Multiple Datasets)
@@ -194,216 +194,6 @@ async function getOrchestrateAccessToken() {
   }
 }
 
-/**
- * Handle ADK Agent Tasks using IBM watsonx Orchestrate ADK Agent
- * Uses the new ADK agent endpoint for financial analysis
- */
-async function handleADKAgentTask(requestBody) {
-  console.log("Starting IBM watsonx Orchestrate ADK Agent Task");
-
-  try {
-    // Get API Key for authentication
-    const apiKey = process.env.ORCHESTRATE_API_KEY;
-    // Use the actual ADK Agent ID from environment or fallback
-    const agentId = process.env.ORCHESTRATE_ADK_AGENT_ID || process.env.ORCHESTRATE_AGENT_ID;
-    const instanceId = process.env.ORCHESTRATE_INSTANCE_ID;
-    const envId = process.env.ORCHESTRATE_AGENT_ENVIRONMENT_ID;
-    
-    // Use Basic Auth instead of Bearer token for ADK Agent
-    const basicAuth = Buffer.from(`apikey:${apiKey}`).toString('base64');
-
-    console.log("🔑 Using Basic Auth with API Key");
-    console.log("🎯 Agent ID:", agentId);
-    console.log("🎯 Instance ID:", instanceId);
-
-    // Prepare request payload
-    const userPrompt = requestBody.prompt || requestBody.text_prompt || "Analyze financial data";
-    let fullMessage = userPrompt;
-
-    // Include transaction data if available
-    if (requestBody.currentData && requestBody.currentData.length > 0) {
-      fullMessage = `${userPrompt}\n\nData Transaksi:\n${JSON.stringify(requestBody.currentData, null, 2)}`;
-    }
-
-    // ADK Agent endpoint - correct format for ADK Agent API
-    const possibleEndpoints = [
-      // Format 1: With instance and environment (working endpoint first)
-      `https://us-south.watson-orchestrate.cloud.ibm.com/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`,
-      `https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`,
-      // Format 2: Direct agent endpoint
-      `https://us-south.watson-orchestrate.cloud.ibm.com/agents/${agentId}/invoke`,
-      `https://api.us-south.watson-orchestrate.cloud.ibm.com/agents/${agentId}/invoke`,
-    ];
-
-    // Try different payload formats
-    const payloadFormats = [
-      { message: fullMessage },
-      { messages: [{ role: "user", content: fullMessage }] },
-      { input: fullMessage },
-    ];
-
-    console.log("📤 Trying multiple payload formats with Basic Auth...");
-
-    // Try each endpoint until one works
-    let response = null;
-    let workingEndpoint = null;
-    let workingPayload = null;
-
-    for (const endpoint of possibleEndpoints) {
-      for (const payload of payloadFormats) {
-        console.log("🎯 Trying endpoint:", endpoint, "with payload:", JSON.stringify(payload).substring(0, 50));
-        
-        try {
-          const testResponse = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Basic ${basicAuth}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          });
-
-          console.log("📊 Response Status:", testResponse.status);
-
-          if (testResponse.status === 200 || testResponse.status === 201) {
-            response = testResponse;
-            workingEndpoint = endpoint;
-            workingPayload = payload;
-            console.log("✅ Working endpoint found:", workingEndpoint);
-            console.log("✅ Working payload format:", JSON.stringify(workingPayload).substring(0, 100));
-            break;
-          } else {
-            const errorText = await testResponse.text();
-            console.log("⚠️ Failed - Status:", testResponse.status);
-          }
-        } catch (error) {
-          console.log("⚠️ Endpoint error:", error.message);
-          continue;
-        }
-      }
-      
-      if (response) break; // Exit outer loop if we found a working endpoint
-    }
-
-    if (!response) {
-      throw new Error(`[ADK Agent Error] All endpoints failed. Tried: ${possibleEndpoints.join(', ')}`);
-    }
-
-    console.log("📊 ADK Agent Response Status:", response.status);
-
-    // Get response as text first to handle both JSON and HTML
-    const responseText = await response.text();
-    console.log("📄 Raw ADK Agent Response (first 500 chars):", responseText.substring(0, 500));
-
-    let responseData;
-    try {
-      // Try to parse as JSON
-      responseData = JSON.parse(responseText);
-      console.log("✅ ADK Agent Response is JSON:", JSON.stringify(responseData, null, 2));
-    } catch (parseError) {
-      console.log("⚠️ ADK Agent Response is not JSON, likely HTML");
-      
-      // If HTML response, use Gemini to extract meaningful content
-      if (responseText.includes('<html') || responseText.includes('<!doctype') || responseText.includes('<!DOCTYPE')) {
-        console.log("🤖 Using Gemini to parse HTML response from ADK Agent");
-
-        try {
-          // Call Gemini to parse HTML and extract agent response
-          const geminiParsePrompt = `You are a helpful assistant that extracts chatbot responses from HTML pages.
-
-Below is an HTML response from IBM Watson Orchestrate ADK Agent. Please extract ONLY the actual agent response text (the chatbot's answer to the user's question).
-
-If there is NO actual agent response in the HTML (e.g., it's just a landing page or error page), respond with: "NO_RESPONSE_FOUND"
-
-HTML Content:
-${responseText.substring(0, 15000)}
-
-User's original question was: "${requestBody.prompt || 'test'}"
-
-Extract ONLY the agent's response, nothing else:`;
-
-          const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-          const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-
-          const geminiResult = await geminiModel.generateContent(geminiParsePrompt);
-          const geminiResponse = geminiResult.response.text();
-
-          console.log("📄 Gemini parsed ADK response:", geminiResponse);
-
-          if (geminiResponse.includes("NO_RESPONSE_FOUND")) {
-            return {
-              content: requestBody.currentData || [],
-              explanation: "⚠️ ADK Agent returned HTML without actual agent response. The endpoint might be for web widget only, not programmatic API.",
-              source: 'Numeri Financial Agent (ADK)',
-              isFilterView: false
-            };
-          } else {
-            return {
-              content: requestBody.currentData || [],
-              explanation: `✅ ADK Agent (via Gemini parser): ${geminiResponse}`,
-              source: 'Numeri Financial Agent (ADK)',
-              isFilterView: false
-            };
-          }
-        } catch (geminiError) {
-          console.error("❌ Gemini HTML parsing failed:", geminiError);
-          // Fallback to simple text extraction
-          const textContent = responseText
-            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          return {
-            content: requestBody.currentData || [],
-            explanation: `⚠️ ADK Agent returned HTML. Gemini parsing failed. Raw text: ${textContent.substring(0, 300)}`,
-            source: 'Numeri Financial Agent (ADK)',
-            isFilterView: false
-          };
-        }
-      } else {
-        // Not HTML, just plain text
-        return {
-          content: requestBody.currentData || [],
-          explanation: responseText.substring(0, 500),
-          source: 'Numeri Financial Agent (ADK)',
-          isFilterView: false
-        };
-      }
-    }
-
-    // Extract agent response
-    let agentExplanation = "No response from agent";
-    
-    if (responseData.choices && responseData.choices[0] && responseData.choices[0].message) {
-      agentExplanation = responseData.choices[0].message.content;
-    } else if (responseData.result) {
-      agentExplanation = responseData.result;
-    } else if (responseData.message) {
-      agentExplanation = responseData.message;
-    } else if (responseData.text) {
-      agentExplanation = responseData.text;
-    } else if (responseData.output) {
-      agentExplanation = typeof responseData.output === 'string' ? responseData.output : JSON.stringify(responseData.output);
-    }
-
-    console.log("✅ Final Agent Response:", agentExplanation);
-
-    // Return structured response
-    return {
-      content: requestBody.currentData || [],
-      explanation: agentExplanation,
-      source: 'Numeri Financial Agent (ADK)',
-      isFilterView: false
-    };
-
-  } catch (error) {
-    console.error('ADK Agent Task Error:', error.message);
-    throw new Error(`ADK Agent failed: ${error.message}`);
-  }
-}
 
 /**
  * Handle Orchestrate Tasks using IBM watsonx Orchestrate /invoke endpoint
@@ -419,7 +209,7 @@ async function handleOrchestrateTask(requestBody) {
     console.log("🔑 Using Basic Auth with API Key");
 
     // Get environment variables
-    const agentId = process.env.ORCHESTRATE_AGENT_ID;
+    const agentId = process.env.ORCHESTRATE_AGENT_NAME || 'NumeriFinancialAgent';
     const envId = process.env.ORCHESTRATE_AGENT_ENVIRONMENT_ID;
     const instanceId = process.env.ORCHESTRATE_INSTANCE_ID;
 
