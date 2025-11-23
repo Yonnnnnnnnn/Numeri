@@ -1,18 +1,31 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// IBM watsonx Orchestrate Configuration
+const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL; 
+const ORCHESTRATE_API_KEY = process.env.ORCHESTRATE_API_KEY;
+const ORCHESTRATE_AGENT_NAME = process.env.ORCHESTRATE_AGENT_NAME;
+
+// Build full Orchestrate endpoint URL
+const ORCHESTRATE_ENDPOINT = `${ORCHESTRATE_BASE_URL}/agent/v1/invoke/${ORCHESTRATE_AGENT_NAME}`;
+
 /**
- * Vercel Serverless Function: Hybrid AI System (IBM Watsonx + Google Gemini)
+ * Vercel Serverless Function: Hybrid AI System (IBM Watsonx Orchestrate + Google Gemini)
  * 
- * This function implements a skill-routing architecture:
- * - Vision Tasks (Image Processing): IBM Watsonx (Hackathon Core Requirement)
- * - Complex Logic/Accounting: Google Gemini 1.5 Flash (High Intelligence)
+ * This function implements a 3-way skill-routing architecture:
+ * - Vision Tasks (Image Processing): Google Gemini 2.5 Flash-Lite (Multimodal)
+ * - Cross-File Tasks (Multi-Data Analysis): IBM watsonx Orchestrate Agent
+ * - Single Logic Tasks (JSON Processing): Google Gemini 2.5 Flash-Lite
  * 
  * Environment Variables Required:
- * - IBM_CLOUD_API_KEY: IBM Cloud API key for authentication
- * - IBM_PROJECT_ID: IBM Cloud project ID for billing/isolation
- * - IBM_REGION: IBM Cloud region (e.g., us-south)
- * - IBM_WATSONX_HOST: watsonx API host
  * - GEMINI_API_KEY: Google Gemini API key for text/logic tasks
+ * - ORCHESTRATE_BASE_URL: IBM watsonx Orchestrate base URL
+ * - ORCHESTRATE_API_KEY: IBM watsonx Orchestrate API key (Bearer Token)
+ * - ORCHESTRATE_AGENT_NAME: IBM watsonx Orchestrate agent name
+ * 
+ * Example Vercel Environment Variables:
+ * ORCHESTRATE_BASE_URL=https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/99a74687-1709-44f8-acd2-48b9fc95930c
+ * ORCHESTRATE_API_KEY=ESRzgf0DpLSDvVioScg9eXgre-BkceDuddjfDiA0Nt48
+ * ORCHESTRATE_AGENT_NAME=NumeriCrossFileAgent
  */
 
 export default async function handler(req, res) {
@@ -55,14 +68,46 @@ STRICT INSTRUCTION:
 
     let result;
 
-    // SKILL ROUTING: Check if this is a vision task
+    // Filter keys to count incoming datasets (excluding image and prompt)
+    const dataKeys = Object.keys(req.body).filter(key => 
+        key.toLowerCase().includes('data') && !key.toLowerCase().includes('base64')
+    );
+
+    // 3-WAY SKILL ROUTING
     if (imageBase64) {
-      // Vision Task: Use IBM Watsonx
-      console.log('Routing to IBM Watsonx for vision task...');
+      // Route 1: Vision Task (Original Logic)
+      console.log('Routing to Gemini 2.5 Flash-Lite for vision task...');
       result = await handleVisionTask(currentData, imageBase64, processedPrompt);
+      
+    } else if (dataKeys.length >= 2) {
+      // Route 2: Cross-File Task -> IBM watsonx Orchestrate
+      
+      console.log(`Routing request to Orchestrate Agent: ${ORCHESTRATE_ENDPOINT}`);
+
+      // Send entire request body (all data and prompt) to Orchestrate
+      const orchestrateResponse = await fetch(ORCHESTRATE_ENDPOINT, {
+          method: 'POST',
+          headers: {
+              // Use Orchestrate API Key as Bearer Token
+              'Authorization': `Bearer ${ORCHESTRATE_API_KEY}`,
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(req.body)
+      });
+      
+      if (!orchestrateResponse.ok) {
+          // Log detailed error
+          const errorText = await orchestrateResponse.text();
+          console.error('Orchestrate API Error:', orchestrateResponse.status, errorText);
+          throw new Error(`Orchestrate API failed with status ${orchestrateResponse.status}. Detail: ${errorText.substring(0, 100)}...`);
+      }
+      
+      // Assume: Orchestrate returns valid JSON
+      result = await orchestrateResponse.json();
+
     } else {
-      // Text/Logic Task: Use Google Gemini 2.5 Flash-Lite
-      console.log('Routing to Gemini 2.5 Flash-Lite for logic task...');
+      // Route 3: Single Logic Task (Original Logic)
+      console.log('Routing to Gemini 2.5 Flash-Lite for single logic task...');
       result = await handleLogicTask(currentData, processedPrompt);
     }
 
