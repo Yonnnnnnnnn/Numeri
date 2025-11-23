@@ -204,14 +204,17 @@ async function handleADKAgentTask(requestBody) {
   try {
     // Get API Key for authentication
     const apiKey = process.env.ORCHESTRATE_API_KEY;
-    const agentName = process.env.ORCHESTRATE_AGENT_NAME; // This is the Agent ID: ce4cbf44-4736-4648-b6cf-5ed2c31791eb
-    const baseUrl = "https://api.us-south.watson-orchestrate.cloud.ibm.com"; // Clean base URL without instance path
+    // Use the actual ADK Agent ID from environment or fallback
+    const agentId = process.env.ORCHESTRATE_ADK_AGENT_ID || process.env.ORCHESTRATE_AGENT_ID;
+    const instanceId = process.env.ORCHESTRATE_INSTANCE_ID;
+    const envId = process.env.ORCHESTRATE_AGENT_ENVIRONMENT_ID;
+    
+    // Use Basic Auth instead of Bearer token for ADK Agent
+    const basicAuth = Buffer.from(`apikey:${apiKey}`).toString('base64');
 
-    console.log("🔑 Using API Key for authentication");
-    console.log("🎯 Agent ID:", agentName);
-
-    // Get IAM token for Bearer authentication
-    const token = await getOrchestrateAccessToken();
+    console.log("🔑 Using Basic Auth with API Key");
+    console.log("🎯 Agent ID:", agentId);
+    console.log("🎯 Instance ID:", instanceId);
 
     // Prepare request payload
     const userPrompt = requestBody.prompt || requestBody.text_prompt || "Analyze financial data";
@@ -222,14 +225,14 @@ async function handleADKAgentTask(requestBody) {
       fullMessage = `${userPrompt}\n\nData Transaksi:\n${JSON.stringify(requestBody.currentData, null, 2)}`;
     }
 
-    // ADK Agent endpoint - try multiple possible endpoints
+    // ADK Agent endpoint - correct format for ADK Agent API
     const possibleEndpoints = [
-      `${baseUrl}/v1/agents/${agentName}/chat`,
-      `${baseUrl}/v1/agents/${agentName}/invoke`,
-      `${baseUrl}/instances/${process.env.ORCHESTRATE_INSTANCE_ID}/agents/${agentName}/environments/${process.env.ORCHESTRATE_AGENT_ENVIRONMENT_ID}/invoke`,
-      `${baseUrl}/api/v1/agents/${agentName}/chat`,
-      `${baseUrl}/agents/${agentName}/chat`,
-      `${baseUrl}/agents/${agentName}/invoke`
+      // Format 1: With instance and environment (most likely correct)
+      `https://api.us-south.watson-orchestrate.cloud.ibm.com/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`,
+      `https://us-south.watson-orchestrate.cloud.ibm.com/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`,
+      // Format 2: Direct agent endpoint
+      `https://api.us-south.watson-orchestrate.cloud.ibm.com/agents/${agentId}/invoke`,
+      `https://us-south.watson-orchestrate.cloud.ibm.com/agents/${agentId}/invoke`,
     ];
 
     // Try different payload formats
@@ -237,11 +240,9 @@ async function handleADKAgentTask(requestBody) {
       { message: fullMessage },
       { messages: [{ role: "user", content: fullMessage }] },
       { input: fullMessage },
-      { text: fullMessage },
-      { query: fullMessage }
     ];
 
-    console.log("📤 Trying multiple payload formats...");
+    console.log("📤 Trying multiple payload formats with Basic Auth...");
 
     // Try each endpoint until one works
     let response = null;
@@ -256,7 +257,7 @@ async function handleADKAgentTask(requestBody) {
           const testResponse = await fetch(endpoint, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': `Basic ${basicAuth}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             },
@@ -304,6 +305,10 @@ async function handleADKAgentTask(requestBody) {
       agentExplanation = responseData.result;
     } else if (responseData.message) {
       agentExplanation = responseData.message;
+    } else if (responseData.text) {
+      agentExplanation = responseData.text;
+    } else if (responseData.output) {
+      agentExplanation = typeof responseData.output === 'string' ? responseData.output : JSON.stringify(responseData.output);
     }
 
     console.log("✅ Final Agent Response:", agentExplanation);
