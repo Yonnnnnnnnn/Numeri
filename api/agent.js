@@ -215,18 +215,23 @@ async function handleOrchestrateTask(requestBody) {
       accessToken = process.env.ORCHESTRATE_API_KEY;
     }
 
-    // 2. Konstruksi URL Orchestrate (sesuai spec)
+    // 2. Konstruksi URL Orchestrate (sesuai embed script)
     const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL;
-    const ORCHESTRATE_AGENT_NAME = process.env.ORCHESTRATE_AGENT_NAME;
-    // Gunakan path dari spec: /orchestrate/api/v1/invoke/agents/
-    const ORCHESTRATE_URL = `${ORCHESTRATE_BASE_URL}/orchestrate/api/v1/invoke/agents/${ORCHESTRATE_AGENT_NAME}`;
+    const ORCHESTRATE_AGENT_ID = process.env.ORCHESTRATE_AGENT_ID;
+    const ORCHESTRATE_AGENT_ENVIRONMENT_ID = process.env.ORCHESTRATE_AGENT_ENVIRONMENT_ID;
+    const ORCHESTRATE_INSTANCE_ID = process.env.ORCHESTRATE_INSTANCE_ID;
+    // Gunakan path dari embed script: /instances/{id}/agents/{agentId}/environments/{envId}/invoke
+    const ORCHESTRATE_URL = `${ORCHESTRATE_BASE_URL}/instances/${ORCHESTRATE_INSTANCE_ID}/agents/${ORCHESTRATE_AGENT_ID}/environments/${ORCHESTRATE_AGENT_ENVIRONMENT_ID}/invoke`;
     
     console.log("🎯 Target URL:", ORCHESTRATE_URL);
     
     // Kirim seluruh body request ke Orchestrate endpoint dengan Access Token
-    // Format body sesuai spec: { "input": { ... } }
+    // Format body sesuai embed script: { "message": "..." }
     const orchestratePayload = {
-        input: requestBody
+        message: requestBody.prompt || "Process financial data",
+        // Include additional data if needed
+        ...(requestBody.currentData && { currentData: requestBody.currentData }),
+        ...(requestBody.imageBase64 && { imageBase64: requestBody.imageBase64 })
     };
     
     console.log("📤 Payload:", JSON.stringify(orchestratePayload, null, 2));
