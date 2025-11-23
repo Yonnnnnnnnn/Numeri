@@ -329,7 +329,7 @@ User's original question was: "${requestBody.prompt || 'unknown'}"
 Extract ONLY the agent's response, nothing else:`;
 
           const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-          const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+          const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
           const geminiResult = await geminiModel.generateContent(geminiParsePrompt);
           const geminiResponse = geminiResult.response.text();
