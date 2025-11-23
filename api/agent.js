@@ -194,181 +194,106 @@ async function getOrchestrateAccessToken() {
   }
 }
 
-/**
- * Membuat sesi baru di IBM Watson Assistant v2 API.
- * @param {string} accessToken - IAM access token
- * @param {string} agentId - Watson Assistant agent/assistant ID
- * @returns {Promise<string>} session_id
- */
-async function createSession(accessToken, agentId) {
-  const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL;
-  // Path: POST /v2/assistants/{agent_id}/sessions
-  const CREATE_URL = `${ORCHESTRATE_BASE_URL}/v2/assistants/${agentId}/sessions`;
 
-  console.log('🔧 Creating new Watson session:', CREATE_URL);
-
-  try {
-    const response = await fetch(CREATE_URL, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`[Orchestrate Session Error] Gagal membuat sesi: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('✅ Session created:', data.session_id);
-    return data.session_id; // Mengembalikan session_id
-  } catch (error) {
-    console.error('Fatal Error Create Session:', error.message);
-    throw new Error(`Orchestrate API gagal di Langkah 1 (Create Session): ${error.message}`);
-  }
-}
 
 /**
- * Menghapus sesi untuk mematuhi FR-07 (Stateless).
- * Dijalankan secara fire-and-forget.
- * @param {string} accessToken - IAM access token
- * @param {string} agentId - Watson Assistant agent/assistant ID
- * @param {string} sessionId - Session ID to delete
- */
-function deleteSession(accessToken, agentId, sessionId) {
-  const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL;
-  // Path: DELETE /v2/assistants/{agent_id}/sessions/{session_id}
-  const DELETE_URL = `${ORCHESTRATE_BASE_URL}/v2/assistants/${agentId}/sessions/${sessionId}`;
-
-  console.log('🗑️ Deleting session (fire-and-forget):', sessionId);
-
-  fetch(DELETE_URL, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  })
-    .then(res => {
-      if (!res.ok) console.warn(`⚠️ Gagal menghapus sesi Orchestrate ${sessionId}. Status: ${res.status}`);
-      else console.log(`✅ Sesi Orchestrate ${sessionId} berhasil dihapus.`);
-    })
-    .catch(e => console.error('❌ Error saat menghapus sesi Orchestrate:', e));
-}
-
-/**
- * Handle Orchestrate Tasks using IBM watsonx Orchestrate
+ * Handle Orchestrate Tasks using IBM watsonx Orchestrate Chat Completions API
  * Processes both AskOrchestrate (explicit target) and Cross-File Analysis requests
+ * Uses OpenAI-compatible stateless endpoint
  */
 async function handleOrchestrateTask(requestBody) {
-  console.log("Starting IBM watsonx Orchestrate Task (Watson Assistant v2 API)");
-
-  let sessionId = null;
-  let accessToken = null;
-  const agentId = process.env.ORCHESTRATE_AGENT_ID; // Menggunakan Agent ID
-
-  try {
-    // Otentikasi - Dapatkan IAM Access Token
+    console.log("Starting IBM watsonx Orchestrate Task (Chat Completions API)");
+    
     try {
-      accessToken = await getOrchestrateAccessToken();
-      console.log("✅ Using IAM Access Token");
-    } catch (iamError) {
-      console.log("⚠️ IAM Token failed, falling back to direct API Key");
-      console.log("🔑 IAM Error:", iamError.message);
-      // Fallback: Gunakan API Key langsung
-      accessToken = process.env.ORCHESTRATE_API_KEY;
-    }
-
-    // 1. Buat Sesi Baru (Langkah 1)
-    sessionId = await createSession(accessToken, agentId);
-
-    // 2. Kirim Pesan (Langkah 2)
-    const MESSAGE_URL = `${process.env.ORCHESTRATE_BASE_URL}/v2/assistants/${agentId}/sessions/${sessionId}/message`;
-    console.log("📤 Sending message to:", MESSAGE_URL);
-
-    const orchestratePayload = {
-      input: {
-        text: requestBody.prompt || requestBody.text_prompt || "Analyze financial data"
-      },
-      // Meneruskan data transaksi ke Orchestrate via context
-      context: {
-        skills: {
-          "main skill": {
-            user_defined: {
-              currentData: requestBody.currentData || []
-            }
-          }
+        // Otentikasi - Dapatkan IAM Access Token
+        let accessToken;
+        try {
+            accessToken = await getOrchestrateAccessToken();
+            console.log("✅ Using IAM Access Token");
+        } catch (iamError) {
+            console.log("⚠️ IAM Token failed, falling back to direct API Key");
+            console.log("🔑 IAM Error:", iamError.message);
+            // Fallback: Gunakan API Key langsung
+            accessToken = process.env.ORCHESTRATE_API_KEY;
         }
-      }
-    };
-
-    console.log("📊 Payload:", JSON.stringify(orchestratePayload, null, 2));
-
-    const orchestrateResponse = await fetch(MESSAGE_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(orchestratePayload)
-    });
-
-    console.log("📊 Response Status:", orchestrateResponse.status);
-
-    // Error Handling Respons (jika status != 200)
-    if (!orchestrateResponse.ok) {
-      const errorText = await orchestrateResponse.text();
-      console.log("🔥 Error Response:", errorText);
-      throw new Error(`[Orchestrate Message Error] Status ${orchestrateResponse.status}: ${errorText}`);
+        // Konstruksi Chat Completions Endpoint
+        const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL;
+        const CHAT_URL = `${ORCHESTRATE_BASE_URL}/v1/chat/completions`;
+        
+        console.log("🎯 Target URL:", CHAT_URL);
+        
+        // Format request dalam OpenAI-compatible format
+        const userPrompt = requestBody.prompt || requestBody.text_prompt || "Analyze financial data";
+        
+        // Include transaction data in the prompt if available
+        let fullPrompt = userPrompt;
+        if (requestBody.currentData && requestBody.currentData.length > 0) {
+            fullPrompt = `User Question: ${userPrompt}\n\nTransaction Data (JSON):\n${JSON.stringify(requestBody.currentData, null, 2)}`;
+        }
+        
+        const orchestratePayload = {
+            messages: [
+                {
+                    role: "user",
+                    content: fullPrompt
+                }
+            ]
+        };
+        console.log("📤 Sending to Chat Completions...");
+        console.log("📊 Payload:", JSON.stringify(orchestratePayload, null, 2));
+        const orchestrateResponse = await fetch(CHAT_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`, 
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(orchestratePayload)
+        });
+        console.log("📊 Response Status:", orchestrateResponse.status);
+        // Error Handling
+        if (!orchestrateResponse.ok) {
+            const errorText = await orchestrateResponse.text();
+            console.log("🔥 Error Response:", errorText);
+            throw new Error(`[Orchestrate API Error] Status ${orchestrateResponse.status}: ${errorText}`);
+        }
+        
+        const data = await orchestrateResponse.json();
+        console.log("📄 Orchestrate Response:", JSON.stringify(data, null, 2));
+        // Extract response from OpenAI-compatible format
+        let orchestrateExplanation = "AskOrchestrate berhasil merespons, namun format tidak terduga.";
+        
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+            orchestrateExplanation = data.choices[0].message.content;
+        } else if (typeof data === 'string') {
+            orchestrateExplanation = data;
+        } else if (data.text) {
+            orchestrateExplanation = data.text;
+        }
+        console.log("✅ Extracted explanation:", orchestrateExplanation);
+        // Return in Numeri format
+        return {
+            filename: requestBody.filename || "transactions_updated.json",
+            content: requestBody.currentData || [],
+            explanation: orchestrateExplanation, 
+        };
+    } catch (error) {
+        console.error('❌ Orchestrate processing error:', error);
+        
+        // Error handling dengan pesan yang jelas
+        let errorMessage = "Orchestrate API failed - Check IBM configuration";
+        
+        if (error.message && error.message.includes('Otentikasi IBM Cloud gagal')) {
+            errorMessage = error.message;
+        } else if (error.message) {
+            errorMessage = `AskOrchestrate Fail: ${error.message}`;
+        }
+        
+        return {
+            "filename": requestBody.filename || "transactions_updated.json",
+            "content": requestBody.content || requestBody.currentData || [],
+            "explanation": errorMessage
+        };
     }
-
-    const data = await orchestrateResponse.json();
-    console.log("📄 Watson Response:", JSON.stringify(data, null, 2));
-
-    // 3. Hapus Sesi (Langkah 3) - Fire-and-Forget
-    deleteSession(accessToken, agentId, sessionId);
-
-    // Post-Processing & Ekstraksi Teks 
-    // Ekstraksi respons dari format JSON Orchestrate/Assistant
-    let orchestrateExplanation = "AskOrchestrate berhasil merespons, namun format teks tidak terduga.";
-
-    // Try to extract text from Watson Assistant v2 response structure
-    if (data.output && data.output.generic && data.output.generic[0] && data.output.generic[0].text) {
-      orchestrateExplanation = data.output.generic[0].text;
-    } else if (data.output && data.output.text && Array.isArray(data.output.text) && data.output.text.length > 0) {
-      // Alternative response format
-      orchestrateExplanation = data.output.text.join(' ');
-    }
-
-    console.log("✅ Extracted explanation:", orchestrateExplanation);
-
-    // Kembalikan ke format Numeri:
-    return {
-      filename: requestBody.filename || "transactions_updated.json",
-      content: requestBody.currentData || [],
-      explanation: orchestrateExplanation,
-    };
-
-  } catch (error) {
-    console.error('❌ Orchestrate processing error:', error);
-
-    // Pastikan sesi dihapus jika terjadi error
-    if (sessionId && accessToken) {
-      deleteSession(accessToken, agentId, sessionId);
-    }
-
-    // Laporkan error dengan pesan yang jelas
-    let errorMessage = "Orchestrate API failed - Check IBM configuration";
-
-    // Jika error terkait IAM token, berikan pesan yang lebih spesifik
-    if (error.message && error.message.includes('Otentikasi IBM Cloud gagal')) {
-      errorMessage = error.message;
-    } else if (error.message) {
-      errorMessage = `AskOrchestrate Fail: ${error.message}`;
-    }
-
-    return {
-      "filename": requestBody.filename || "transactions_updated.json",
-      "content": requestBody.content || requestBody.currentData || [],
-      "explanation": errorMessage
-    };
-  }
 }
 
 /**
