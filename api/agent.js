@@ -288,8 +288,6 @@ async function handleOrchestrateTask(requestBody) {
     // Jika Orchestrate mengembalikan jawaban teks murni, bungkus dalam struktur standar
     if (typeof responseData === 'string' || (responseData.text && typeof responseData.text === 'string')) {
         const orchestrateText = responseData.text || responseData;
-    if (typeof orchestrateResult === 'string' || (orchestrateResult.text && typeof orchestrateResult.text === 'string')) {
-        const orchestrateText = orchestrateResult.text || orchestrateResult;
         finalResponse = {
             // 'filename' dan 'content' diisi dengan data yang dikirim user untuk menjaga state
             "filename": requestBody.filename || "transactions_updated.json",
@@ -298,11 +296,11 @@ async function handleOrchestrateTask(requestBody) {
         };
     } 
     // Jika Orchestrate sudah mengembalikan struktur JSON yang benar, gunakan langsung
-    else if (orchestrateResult.content && Array.isArray(orchestrateResult.content)) {
+    else if (responseData.content && Array.isArray(responseData.content)) {
         finalResponse = {
-            "filename": orchestrateResult.filename || "transactions_updated.json",
-            "content": orchestrateResult.content,
-            "explanation": orchestrateResult.explanation || "Processing complete."
+            "filename": responseData.filename || "transactions_updated.json",
+            "content": responseData.content,
+            "explanation": responseData.explanation || "Processing complete."
         };
     }
     // Fallback untuk respons tidak terduga
@@ -310,7 +308,7 @@ async function handleOrchestrateTask(requestBody) {
         finalResponse = {
             "filename": requestBody.filename || "transactions_updated.json",
             "content": requestBody.content || requestBody.currentData || [],
-            "explanation": JSON.stringify(orchestrateResult)
+            "explanation": JSON.stringify(responseData)
         };
     }
     
