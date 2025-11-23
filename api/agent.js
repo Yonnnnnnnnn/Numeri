@@ -197,103 +197,160 @@ async function getOrchestrateAccessToken() {
 
 
 /**
- * Handle Orchestrate Tasks using IBM watsonx Orchestrate Chat Completions API
+ * Handle Orchestrate Tasks using IBM watsonx Orchestrate /invoke endpoint
  * Processes both AskOrchestrate (explicit target) and Cross-File Analysis requests
- * Uses OpenAI-compatible stateless endpoint
+ * Uses /invoke endpoint with Accept: application/json header
  */
 async function handleOrchestrateTask(requestBody) {
-    console.log("Starting IBM watsonx Orchestrate Task (Chat Completions API)");
-    
+  console.log("Starting IBM watsonx Orchestrate Task (/invoke endpoint)");
+
+  try {
+    // Otentikasi - Dapatkan IAM Access Token
+    let accessToken;
     try {
-        // Otentikasi - Dapatkan IAM Access Token
-        let accessToken;
-        try {
-            accessToken = await getOrchestrateAccessToken();
-            console.log("✅ Using IAM Access Token");
-        } catch (iamError) {
-            console.log("⚠️ IAM Token failed, falling back to direct API Key");
-            console.log("🔑 IAM Error:", iamError.message);
-            // Fallback: Gunakan API Key langsung
-            accessToken = process.env.ORCHESTRATE_API_KEY;
-        }
-        // Konstruksi Chat Completions Endpoint
-        const ORCHESTRATE_BASE_URL = process.env.ORCHESTRATE_BASE_URL;
-        const CHAT_URL = `${ORCHESTRATE_BASE_URL}/v1/chat/completions`;
-        
-        console.log("🎯 Target URL:", CHAT_URL);
-        
-        // Format request dalam OpenAI-compatible format
-        const userPrompt = requestBody.prompt || requestBody.text_prompt || "Analyze financial data";
-        
-        // Include transaction data in the prompt if available
-        let fullPrompt = userPrompt;
-        if (requestBody.currentData && requestBody.currentData.length > 0) {
-            fullPrompt = `User Question: ${userPrompt}\n\nTransaction Data (JSON):\n${JSON.stringify(requestBody.currentData, null, 2)}`;
-        }
-        
-        const orchestratePayload = {
-            messages: [
-                {
-                    role: "user",
-                    content: fullPrompt
-                }
-            ]
-        };
-        console.log("📤 Sending to Chat Completions...");
-        console.log("📊 Payload:", JSON.stringify(orchestratePayload, null, 2));
-        const orchestrateResponse = await fetch(CHAT_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`, 
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(orchestratePayload)
-        });
-        console.log("📊 Response Status:", orchestrateResponse.status);
-        // Error Handling
-        if (!orchestrateResponse.ok) {
-            const errorText = await orchestrateResponse.text();
-            console.log("🔥 Error Response:", errorText);
-            throw new Error(`[Orchestrate API Error] Status ${orchestrateResponse.status}: ${errorText}`);
-        }
-        
-        const data = await orchestrateResponse.json();
-        console.log("📄 Orchestrate Response:", JSON.stringify(data, null, 2));
-        // Extract response from OpenAI-compatible format
-        let orchestrateExplanation = "AskOrchestrate berhasil merespons, namun format tidak terduga.";
-        
-        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-            orchestrateExplanation = data.choices[0].message.content;
-        } else if (typeof data === 'string') {
-            orchestrateExplanation = data;
-        } else if (data.text) {
-            orchestrateExplanation = data.text;
-        }
-        console.log("✅ Extracted explanation:", orchestrateExplanation);
-        // Return in Numeri format
-        return {
-            filename: requestBody.filename || "transactions_updated.json",
-            content: requestBody.currentData || [],
-            explanation: orchestrateExplanation, 
-        };
-    } catch (error) {
-        console.error('❌ Orchestrate processing error:', error);
-        
-        // Error handling dengan pesan yang jelas
-        let errorMessage = "Orchestrate API failed - Check IBM configuration";
-        
-        if (error.message && error.message.includes('Otentikasi IBM Cloud gagal')) {
-            errorMessage = error.message;
-        } else if (error.message) {
-            errorMessage = `AskOrchestrate Fail: ${error.message}`;
-        }
-        
-        return {
-            "filename": requestBody.filename || "transactions_updated.json",
-            "content": requestBody.content || requestBody.currentData || [],
-            "explanation": errorMessage
-        };
+      accessToken = await getOrchestrateAccessToken();
+      console.log("✅ Using IAM Access Token");
+    } catch (iamError) {
+      console.log("⚠️ IAM Token failed, falling back to direct API Key");
+      console.log("🔑 IAM Error:", iamError.message);
+      accessToken = process.env.ORCHESTRATE_API_KEY;
     }
+
+    // Get environment variables
+    const agentId = process.env.ORCHESTRATE_AGENT_ID;
+    const envId = process.env.ORCHESTRATE_AGENT_ENVIRONMENT_ID;
+    const instanceId = process.env.ORCHESTRATE_INSTANCE_ID;
+
+    // Construct /invoke endpoint
+    // Try format 1: with 'api.' prefix (from service instance URL)
+    const baseUrl1 = `https://api.us-south.watson-orchestrate.cloud.ibm.com`;
+    const invokeUrl1 = `${baseUrl1}/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`;
+
+    // Try format 2: without 'api.' prefix (from embed script)
+    const baseUrl2 = `https://us-south.watson-orchestrate.cloud.ibm.com`;
+    const invokeUrl2 = `${baseUrl2}/instances/${instanceId}/agents/${agentId}/environments/${envId}/invoke`;
+
+    console.log("🎯 Trying URL Format 1 (with api.):", invokeUrl1);
+
+    // Prepare request payload
+    const userPrompt = requestBody.prompt || requestBody.text_prompt || "Analyze financial data";
+    let fullMessage = userPrompt;
+
+    // Include transaction data if available
+    if (requestBody.currentData && requestBody.currentData.length > 0) {
+      fullMessage = `${userPrompt}\n\nData Transaksi:\n${JSON.stringify(requestBody.currentData, null, 2)}`;
+    }
+
+    const payload = {
+      message: fullMessage
+    };
+
+    console.log("📤 Payload:", JSON.stringify(payload, null, 2));
+
+    // Try Format 1 first
+    let response = await fetch(invokeUrl1, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'  // Force JSON response
+      },
+      body: JSON.stringify(payload)
+    });
+
+    console.log("📊 Format 1 Response Status:", response.status);
+
+    // If Format 1 fails with 404, try Format 2
+    if (response.status === 404) {
+      console.log("⚠️ Format 1 failed (404), trying Format 2 (without api.):", invokeUrl2);
+
+      response = await fetch(invokeUrl2, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      console.log("📊 Format 2 Response Status:", response.status);
+    }
+
+    // Error handling
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log("🔥 Error Response:", errorText);
+      throw new Error(`[Orchestrate Invoke Error] Status ${response.status}: ${errorText}`);
+    }
+
+    // Try to parse as JSON
+    const responseText = await response.text();
+    console.log("📄 Raw Response (first 500 chars):", responseText.substring(0, 500));
+
+    let orchestrateExplanation;
+
+    try {
+      const data = JSON.parse(responseText);
+      console.log("✅ Response is JSON:", JSON.stringify(data, null, 2));
+
+      // Extract text from various possible response formats
+      if (data.text) {
+        orchestrateExplanation = data.text;
+      } else if (data.message) {
+        orchestrateExplanation = data.message;
+      } else if (data.response) {
+        orchestrateExplanation = data.response;
+      } else if (data.output && data.output.generic && data.output.generic[0]) {
+        orchestrateExplanation = data.output.generic[0].text || JSON.stringify(data);
+      } else {
+        orchestrateExplanation = JSON.stringify(data);
+      }
+    } catch (parseError) {
+      console.log("⚠️ Response is not JSON, treating as text/HTML");
+
+      // If still HTML, extract text from it
+      if (responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
+        // Simple HTML text extraction
+        const textContent = responseText
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        orchestrateExplanation = `⚠️ Watson Orchestrate mengembalikan HTML (bukan JSON). Extracted text: ${textContent.substring(0, 500)}`;
+      } else {
+        orchestrateExplanation = responseText;
+      }
+    }
+
+    console.log("✅ Extracted explanation:", orchestrateExplanation);
+
+    // Return in Numeri format
+    return {
+      filename: requestBody.filename || "transactions_updated.json",
+      content: requestBody.currentData || [],
+      explanation: orchestrateExplanation
+    };
+
+  } catch (error) {
+    console.error('❌ Orchestrate processing error:', error);
+
+    let errorMessage = "Orchestrate API failed - Check IBM configuration";
+
+    if (error.message && error.message.includes('Otentikasi IBM Cloud gagal')) {
+      errorMessage = error.message;
+    } else if (error.message) {
+      errorMessage = `AskOrchestrate Fail: ${error.message}`;
+    }
+
+    return {
+      "filename": requestBody.filename || "transactions_updated.json",
+      "content": requestBody.content || requestBody.currentData || [],
+      "explanation": errorMessage
+    };
+  }
 }
 
 /**
